@@ -1,0 +1,54 @@
+sudo: false
+language: rust
+
+# necessary for `travis-cargo coveralls --no-sudo`
+addons:
+  apt:
+    packages:
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+      - binutils-dev # needed for --verify
+
+os:
+  - linux
+  - osx
+
+cache:
+  apt: true
+  directories:
+    - target/debug/build
+    - target/debug/deps
+    - $HOME/.cargo
+
+rust:
+  - nightly
+  - beta
+  - stable
+
+# load travis-cargo
+before_script:
+  - |
+      pip install 'travis-cargo<0.2' --user &&
+      export PATH=$HOME/Library/Python/2.7/bin:$HOME/.local/bin:$PATH
+      if test "$TRAVIS_RUST_VERSION" = "nightly"; then
+        if ! cargo --list | grep -q clippy; then
+          cargo install --git=https://github.com/arcnmx/cargo-clippy
+        fi
+      fi
+
+# the main build
+script:
+  - travis-cargo build
+  - |
+      if test "$TRAVIS_RUST_VERSION" = "nightly"; then
+        cargo clippy --features=$TRAVIS_CARGO_NIGHTLY_FEATURE -- -Wclippy_pedantic
+      fi
+
+matrix:
+  allow_failures:
+    - rust: nightly
+
+env:
+  global:
+    - TRAVIS_CARGO_NIGHTLY_FEATURE='lint'

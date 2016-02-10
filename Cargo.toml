@@ -2,6 +2,11 @@
 name = "hasbuildpackbundlerupgradedyet"
 version = "0.1.0"
 authors = ["Mark Lee"]
+license = "AGPL-3.0"
+
+[features]
+
+lint = ["clippy"]
 
 [dependencies]
 
@@ -9,3 +14,5 @@ hyper = "0.7"
 regex = "0.1"
 rquery = "0.2"
 semver = "0.2"
+
+clippy = { version = "*", optional = true }
