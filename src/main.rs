@@ -17,11 +17,17 @@ extern crate hyper;
 extern crate regex;
 extern crate rquery;
 extern crate semver;
+extern crate serde;
+extern crate serde_json;
 
-use hyper::Client;
+use hyper::{Client, Get, Server};
+use hyper::header::{Accept, ContentType};
+use hyper::server::{Request, Response};
+use hyper::uri::RequestUri::AbsolutePath;
 use regex::Regex;
 use rquery::Document;
 use semver::Version;
+use std::collections::HashMap;
 use std::io::{Error, Read};
 
 const OLD_BUNDLER_VERSION: &'static str = "1.9.7";
@@ -74,11 +80,56 @@ fn is_bundler_upgraded(client: &Client) -> bool {
     }
 }
 
-fn main() {
-    let client = Client::new();
-    if is_bundler_upgraded(&client) {
-        println!("NO");
+fn determine_content_type(req: &Request) -> ContentType {
+    if let Some(accept) = req.headers.get::<Accept>() {
+        let mut use_json = false;
+        for qitem in &accept.0 {
+            let qitem_str = &format!("{}", qitem)[..];
+            if qitem_str == "application/json" {
+                use_json = true;
+                break
+            }
+        }
+
+        if use_json {
+            ContentType::json()
+        } else {
+            ContentType::html()
+        }
     } else {
-        println!("YES");
+        ContentType::html()
     }
+}
+
+fn result_to_json(result: bool) -> String {
+    let mut map = HashMap::new();
+    map.insert("result".to_owned(), result);
+    serde_json::to_string(&map).expect("Could not serialize result!")
+}
+
+fn main() {
+    let server = Server::http("0.0.0.0:6000").expect("Could not create server!");
+    server.handle(|req: Request, mut res: Response| {
+        match req.uri {
+            AbsolutePath(ref path) => match (&req.method, &path[..]) {
+                (&Get, "/") => {
+                    let client = Client::new();
+                    let result = is_bundler_upgraded(&client);
+                    let content_type = determine_content_type(&req);
+                    let data = match &format!("{}", content_type)[..] {
+                        "application/json; charset=utf-8" => result_to_json(result),
+                        _ => "".to_owned(),
+                    };
+                    res.headers_mut().set(content_type);
+                    res.send(data.as_bytes()).expect("Could not set response body!")
+                },
+                _  => {
+                    *res.status_mut() = hyper::NotFound;
+                },
+            },
+            _ => {
+                *res.status_mut() = hyper::BadRequest;
+            },
+        }
+    }).expect("Could not set up HTTP request handler!");
 }
