@@ -28,6 +28,7 @@ use regex::Regex;
 use rquery::Document;
 use semver::Version;
 use std::collections::HashMap;
+use std::fs::File;
 use std::io::{Error, Read};
 
 const MIN_BUNDLER_VERSION: &'static str = "1.11.0";
@@ -107,6 +108,22 @@ fn result_to_json(result: bool) -> String {
     serde_json::to_string(&map).expect("Could not serialize result!")
 }
 
+fn result_to_html(result: bool) -> String {
+    let result_str = if result {
+        r#"<p class="yes"><i class="emoji"></i>Yes</p>"#
+    } else {
+        r#"<p class="no"><i class="emoji"></i>No</p>"#
+    };
+    match File::open("index.html") {
+        Ok(mut html_file) => {
+            let mut html = String::new();
+            html_file.read_to_string(&mut html).expect("Could not read HTML file!");
+            html.replace("{{ is_bundler_upgraded }}", result_str).replace("{{ MIN_BUNDLER_VERSION }}", MIN_BUNDLER_VERSION)
+        },
+        Err(error) => format!("HTML NOT FOUND: {}", error),
+    }
+}
+
 fn main() {
     let server = Server::http("0.0.0.0:9000").expect("Could not create server!");
     server.handle(|req: Request, mut res: Response| {
@@ -118,7 +135,7 @@ fn main() {
                     let content_type = determine_content_type(&req);
                     let data = match &format!("{}", content_type)[..] {
                         "application/json; charset=utf-8" => result_to_json(result),
-                        _ => "".to_owned(),
+                        _                                 => result_to_html(result),
                     };
                     res.headers_mut().set(content_type);
                     res.send(data.as_bytes()).expect("Could not set response body!")

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Has Heroku's Ruby Buildpack Upgraded Bundler Yet?</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/g/normalize@3.0.3,typeplate@1.1.2">
+  <link rel="stylesheet" href="https://code.cdn.mozilla.net/fonts/fira.css">
+  <style>
+    html {font-family: "Fira Sans"}
+    body {text-align: center}
+    main p {font-variant: small-caps}
+    footer {bottom: 0; position: fixed; width: 100%}
+    footer p {margin-bottom: 0}
+    /* From: https://github.com/Ranks/emojione/blob/master/assets/css/emojione-awesome.css */
+    .emoji {background: no-repeat center center / 1em 1em; display: inline-block; height: 1em; margin: -.2ex .05em 0 .1em; vertical-align: middle; width: 1em}
+    .yes .emoji {background-image: url("https://cdn.jsdelivr.net/emojione/assets/svg/2705.svg")}
+    .no .emoji {background-image: url("https://cdn.jsdelivr.net/emojione/assets/svg/274e.svg")}
+    .github {background-image: url("https://rawgit.com/github/octicons/master/svg/mark-github.svg")}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Has <a href="https://heroku.com/">Heroku</a>'s <a href="https://github.com/heroku/heroku-buildpack-ruby">Ruby Buildpack</a> Upgraded <a href="http://bundler.io">Bundler</a> to ≥ {{ MIN_BUNDLER_VERSION }} Yet?</h1>
+  </header>
+  <main class="tera">
+    {{ is_bundler_upgraded }}
+  </main>
+  <footer>
+    <p>Copyright © 2016 <a href="https://malept.com/" rel="me">Mark Lee</a>. <a href="https://www.gnu.org/licenses/agpl.html" rel="license">Some Rights Reserved</a>. <a href="https://github.com/malept/hasbuildpackbundlerupgradedyet" title="View Source Code"><i class="github emoji"></i></a></p>
+  </footer>
+</body>
+</html>
