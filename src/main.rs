@@ -108,7 +108,7 @@ fn result_to_json(result: bool) -> String {
 }
 
 fn main() {
-    let server = Server::http("0.0.0.0:6000").expect("Could not create server!");
+    let server = Server::http("0.0.0.0:9000").expect("Could not create server!");
     server.handle(|req: Request, mut res: Response| {
         match req.uri {
             AbsolutePath(ref path) => match (&req.method, &path[..]) {
