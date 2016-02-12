@@ -30,7 +30,7 @@ use semver::Version;
 use std::collections::HashMap;
 use std::io::{Error, Read};
 
-const OLD_BUNDLER_VERSION: &'static str = "1.9.7";
+const MIN_BUNDLER_VERSION: &'static str = "1.11.0";
 const RUBY_LANGPACK_RELEASES_URL: &'static str = "https://github.\
                                                   com/heroku/heroku-buildpack-ruby/releases.atom";
 
@@ -70,11 +70,11 @@ fn bundler_version_from_ruby_buildpack(client: &Client) -> Option<String> {
 
 fn is_bundler_upgraded(client: &Client) -> bool {
     if let Some(buildpack_bundler_version_str) = bundler_version_from_ruby_buildpack(&client) {
-        let old_version = Version::parse(OLD_BUNDLER_VERSION)
-                              .expect("Could not parse old version!");
+        let min_version = Version::parse(MIN_BUNDLER_VERSION)
+                              .expect("Could not parse min version!");
         let new_version = Version::parse(&buildpack_bundler_version_str[..])
                               .expect("Could not parse new version!");
-        old_version >= new_version
+        min_version < new_version
     } else {
         false
     }
