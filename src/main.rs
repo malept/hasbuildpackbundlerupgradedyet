@@ -88,7 +88,7 @@ fn determine_content_type(req: &Request) -> ContentType {
             let qitem_str = &format!("{}", qitem)[..];
             if qitem_str == "application/json" {
                 use_json = true;
-                break
+                break;
             }
         }
 
@@ -118,8 +118,9 @@ fn result_to_html(result: bool) -> String {
         Ok(mut html_file) => {
             let mut html = String::new();
             html_file.read_to_string(&mut html).expect("Could not read HTML file!");
-            html.replace("{{ is_bundler_upgraded }}", result_str).replace("{{ MIN_BUNDLER_VERSION }}", MIN_BUNDLER_VERSION)
-        },
+            html.replace("{{ is_bundler_upgraded }}", result_str)
+                .replace("{{ MIN_BUNDLER_VERSION }}", MIN_BUNDLER_VERSION)
+        }
         Err(error) => format!("HTML NOT FOUND: {}", error),
     }
 }
@@ -127,26 +128,29 @@ fn result_to_html(result: bool) -> String {
 fn main() {
     let server = Server::http("0.0.0.0:9000").expect("Could not create server!");
     server.handle(|req: Request, mut res: Response| {
-        match req.uri {
-            AbsolutePath(ref path) => match (&req.method, &path[..]) {
-                (&Get, "/") => {
-                    let client = Client::new();
-                    let result = is_bundler_upgraded(&client);
-                    let content_type = determine_content_type(&req);
-                    let data = match &format!("{}", content_type)[..] {
-                        "application/json; charset=utf-8" => result_to_json(result),
-                        _                                 => result_to_html(result),
-                    };
-                    res.headers_mut().set(content_type);
-                    res.send(data.as_bytes()).expect("Could not set response body!")
-                },
-                _  => {
-                    *res.status_mut() = hyper::NotFound;
-                },
-            },
-            _ => {
-                *res.status_mut() = hyper::BadRequest;
-            },
-        }
-    }).expect("Could not set up HTTP request handler!");
+              match req.uri {
+                  AbsolutePath(ref path) => {
+                      match (&req.method, &path[..]) {
+                          (&Get, "/") => {
+                              let client = Client::new();
+                              let result = is_bundler_upgraded(&client);
+                              let content_type = determine_content_type(&req);
+                              let data = match &format!("{}", content_type)[..] {
+                                  "application/json; charset=utf-8" => result_to_json(result),
+                                  _ => result_to_html(result),
+                              };
+                              res.headers_mut().set(content_type);
+                              res.send(data.as_bytes()).expect("Could not set response body!")
+                          }
+                          _ => {
+                              *res.status_mut() = hyper::NotFound;
+                          }
+                      }
+                  }
+                  _ => {
+                      *res.status_mut() = hyper::BadRequest;
+                  }
+              }
+          })
+          .expect("Could not set up HTTP request handler!");
 }
