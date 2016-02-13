@@ -128,15 +128,11 @@ fn result_to_html(result: bool) -> String {
 }
 
 fn server_port() -> String {
-    match env::var_os("PORT") {
-        Some(val) => {
-            match val.into_string() {
-                Ok(port) => port,
-                _ => format!("{}", DEFAULT_SERVER_PORT),
-            }
-        }
-        None => format!("{}", DEFAULT_SERVER_PORT),
+    match env::var("PORT") {
+        Ok(port) => port,
+        _ => format!("{}", DEFAULT_SERVER_PORT),
     }
+}
 }
 
 fn main() {
