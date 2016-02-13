@@ -132,15 +132,16 @@ fn server_port() -> String {
         Some(val) => {
             match val.into_string() {
                 Ok(port) => port,
-                _        => format!("{}", DEFAULT_SERVER_PORT),
+                _ => format!("{}", DEFAULT_SERVER_PORT),
             }
-        },
-        None      => format!("{}", DEFAULT_SERVER_PORT),
+        }
+        None => format!("{}", DEFAULT_SERVER_PORT),
     }
 }
 
 fn main() {
-    let server = Server::http(&format!("0.0.0.0:{}", server_port())[..]).expect("Could not create server!");
+    let server = Server::http(&format!("0.0.0.0:{}", server_port())[..])
+                     .expect("Could not create server!");
     server.handle(|req: Request, mut res: Response| {
               match req.uri {
                   AbsolutePath(ref path) => {
