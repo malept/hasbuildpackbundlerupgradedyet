@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 extern crate hyper;
+extern crate redis;
 extern crate regex;
 extern crate rquery;
 extern crate semver;
@@ -24,6 +25,7 @@ use hyper::{Client as HTTPClient, Get, Server};
 use hyper::header::{Accept, ContentType};
 use hyper::server::{Request, Response};
 use hyper::uri::RequestUri::AbsolutePath;
+use redis::Commands;
 use regex::Regex;
 use rquery::Document;
 use semver::Version;
@@ -47,7 +49,7 @@ fn download_url(http: &HTTPClient, url: &str) -> io::Result<String> {
     }
 }
 
-fn latest_buildpack_release(http: &HTTPClient) -> String {
+fn download_latest_buildpack_release(http: &HTTPClient) -> String {
     let xml = download_url(&http, RUBY_LANGPACK_RELEASES_URL)
                   .expect("Could not download Atom releases!");
     let atom_doc = Document::new_from_xml_string(&xml[..]).expect("Could not parse Atom releases!");
@@ -56,24 +58,62 @@ fn latest_buildpack_release(http: &HTTPClient) -> String {
     latest_tag.text().clone()
 }
 
-fn bundler_version_from_ruby_buildpack(http: &HTTPClient) -> Option<String> {
+fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> String {
+    let set_result: redis::RedisResult<()> = redis.set_ex(key, value, 3600);
+    if let Err(_) = set_result {
+        println!("Cannot set {} in Redis, ignoring", key);
+    }
+    value.to_owned()
+}
+
+fn latest_buildpack_release(http: &HTTPClient, maybe_redis: &Option<redis::Connection>) -> String {
+    if let Some(ref redis) = *maybe_redis {
+        match redis.get("latest_buildpack_release") {
+            Ok(buildpack_release) => buildpack_release,
+            _ => {
+                let buildpack_release = download_latest_buildpack_release(http);
+                redis_cache_value(redis, "latest_buildpack_release", &buildpack_release[..])
+            }
+        }
+    } else {
+        download_latest_buildpack_release(http)
+    }
+}
+
+fn bundler_version_from_ruby_buildpack(http: &HTTPClient,
+                                       maybe_redis: Option<redis::Connection>)
+                                       -> Option<String> {
     let ruby_langpack_url = format!("https://raw.githubusercontent.com/\
                                      heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
                                      ruby.rb",
-                                    latest_buildpack_release(&http));
+                                    latest_buildpack_release(&http, &maybe_redis));
     let ruby_file = &download_url(&http, &ruby_langpack_url[..])
                          .expect("Could not download ruby.rb!")[..];
     let regex = Regex::new(r#"BUNDLER_VERSION += "(.+?)""#).expect("Invalid regular expression!");
     if regex.is_match(ruby_file) {
         let captures = regex.captures(ruby_file).expect("Could not match?!");
-        Some(captures.at(1).expect("Capture not found?!").to_owned())
+        let version = captures.at(1).expect("Capture not found?!");
+        if let Some(redis) = maybe_redis {
+            redis_cache_value(&redis, "new_bundler_version", version);
+        }
+        Some(version.to_owned())
     } else {
         None
     }
 }
 
-fn is_bundler_upgraded(http: &HTTPClient) -> bool {
-    if let Some(buildpack_bundler_version_str) = bundler_version_from_ruby_buildpack(&http) {
+fn is_bundler_upgraded(http: &HTTPClient,
+                       redis_result: redis::RedisResult<redis::Connection>)
+                       -> bool {
+    let bundler_version_result = if let Ok(redis) = redis_result {
+        match redis.get("new_bundler_version") {
+            Ok(version) => Some(version),
+            _ => bundler_version_from_ruby_buildpack(&http, Some(redis)),
+        }
+    } else {
+        bundler_version_from_ruby_buildpack(&http, None)
+    };
+    if let Some(buildpack_bundler_version_str) = bundler_version_result {
         let min_version = Version::parse(MIN_BUNDLER_VERSION)
                               .expect("Could not parse min version!");
         let new_version = Version::parse(&buildpack_bundler_version_str[..])
@@ -134,6 +174,18 @@ fn server_port() -> String {
         _ => format!("{}", DEFAULT_SERVER_PORT),
     }
 }
+
+fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
+    match env::var("REDIS_URL") {
+        Ok(redis_url) => {
+            let client = redis::Client::open(&redis_url[..]).expect("Cannot connect to Redis");
+            client.get_connection()
+        }
+        _ => {
+            Err(redis::RedisError::from(io::Error::new(io::ErrorKind::Other,
+                                                       "REDIS_URL not found")))
+        }
+    }
 }
 
 fn main() {
@@ -145,7 +197,8 @@ fn main() {
                       match (&req.method, &path[..]) {
                           (&Get, "/") => {
                               let http = HTTPClient::new();
-                              let result = is_bundler_upgraded(&http);
+                              let redis = connect_to_redis();
+                              let result = is_bundler_upgraded(&http, redis);
                               let content_type = determine_content_type(&req);
                               let data = match &format!("{}", content_type)[..] {
                                   "application/json; charset=utf-8" => result_to_json(result),

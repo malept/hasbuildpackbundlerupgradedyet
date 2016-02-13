@@ -11,6 +11,7 @@ lint = ["clippy"]
 [dependencies]
 
 hyper = "0.7"
+redis = "0.5"
 regex = "0.1"
 rquery = "0.2"
 semver = "0.2"
