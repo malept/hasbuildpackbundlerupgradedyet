@@ -20,7 +20,7 @@ extern crate semver;
 extern crate serde;
 extern crate serde_json;
 
-use hyper::{Client, Get, Server};
+use hyper::{Client as HTTPClient, Get, Server};
 use hyper::header::{Accept, ContentType};
 use hyper::server::{Request, Response};
 use hyper::uri::RequestUri::AbsolutePath;
@@ -30,15 +30,16 @@ use semver::Version;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-use std::io::{Error, Read};
+use std::io;
+use std::io::Read;
 
 const DEFAULT_SERVER_PORT: u32 = 9000;
 const MIN_BUNDLER_VERSION: &'static str = "1.11.0";
 const RUBY_LANGPACK_RELEASES_URL: &'static str = "https://github.\
                                                   com/heroku/heroku-buildpack-ruby/releases.atom";
 
-fn download_url(client: &Client, url: &str) -> Result<String, Error> {
-    let mut resp = client.get(url).send().expect("Could not send HTTP request");
+fn download_url(http: &HTTPClient, url: &str) -> io::Result<String> {
+    let mut resp = http.get(url).send().expect("Could not send HTTP request");
     let mut body = String::new();
     match resp.read_to_string(&mut body) {
         Err(error) => Err(error),
@@ -46,8 +47,8 @@ fn download_url(client: &Client, url: &str) -> Result<String, Error> {
     }
 }
 
-fn latest_buildpack_release(client: &Client) -> String {
-    let xml = download_url(&client, RUBY_LANGPACK_RELEASES_URL)
+fn latest_buildpack_release(http: &HTTPClient) -> String {
+    let xml = download_url(&http, RUBY_LANGPACK_RELEASES_URL)
                   .expect("Could not download Atom releases!");
     let atom_doc = Document::new_from_xml_string(&xml[..]).expect("Could not parse Atom releases!");
     let latest_tag = atom_doc.select("entry title")
@@ -55,12 +56,12 @@ fn latest_buildpack_release(client: &Client) -> String {
     latest_tag.text().clone()
 }
 
-fn bundler_version_from_ruby_buildpack(client: &Client) -> Option<String> {
+fn bundler_version_from_ruby_buildpack(http: &HTTPClient) -> Option<String> {
     let ruby_langpack_url = format!("https://raw.githubusercontent.com/\
                                      heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
                                      ruby.rb",
-                                    latest_buildpack_release(&client));
-    let ruby_file = &download_url(&client, &ruby_langpack_url[..])
+                                    latest_buildpack_release(&http));
+    let ruby_file = &download_url(&http, &ruby_langpack_url[..])
                          .expect("Could not download ruby.rb!")[..];
     let regex = Regex::new(r#"BUNDLER_VERSION += "(.+?)""#).expect("Invalid regular expression!");
     if regex.is_match(ruby_file) {
@@ -71,8 +72,8 @@ fn bundler_version_from_ruby_buildpack(client: &Client) -> Option<String> {
     }
 }
 
-fn is_bundler_upgraded(client: &Client) -> bool {
-    if let Some(buildpack_bundler_version_str) = bundler_version_from_ruby_buildpack(&client) {
+fn is_bundler_upgraded(http: &HTTPClient) -> bool {
+    if let Some(buildpack_bundler_version_str) = bundler_version_from_ruby_buildpack(&http) {
         let min_version = Version::parse(MIN_BUNDLER_VERSION)
                               .expect("Could not parse min version!");
         let new_version = Version::parse(&buildpack_bundler_version_str[..])
@@ -143,8 +144,8 @@ fn main() {
                   AbsolutePath(ref path) => {
                       match (&req.method, &path[..]) {
                           (&Get, "/") => {
-                              let client = Client::new();
-                              let result = is_bundler_upgraded(&client);
+                              let http = HTTPClient::new();
+                              let result = is_bundler_upgraded(&http);
                               let content_type = determine_content_type(&req);
                               let data = match &format!("{}", content_type)[..] {
                                   "application/json; charset=utf-8" => result_to_json(result),
