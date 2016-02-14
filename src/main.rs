@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+extern crate env_logger;
 extern crate hyper;
+#[macro_use] extern crate log;
 extern crate redis;
 extern crate regex;
 extern crate rquery;
@@ -61,7 +63,7 @@ fn download_latest_buildpack_release(http: &HTTPClient) -> String {
 fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> String {
     let set_result: redis::RedisResult<()> = redis.set_ex(key, value, 3600);
     if let Err(_) = set_result {
-        println!("Cannot set {} in Redis, ignoring", key);
+        warn!("Cannot set {} in Redis, ignoring", key);
     }
     value.to_owned()
 }
@@ -69,7 +71,7 @@ fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> Strin
 fn redis_cache_hash_value(redis: &redis::Connection, hash_name: &str, key: &str, value: &str) {
     let set_result: redis::RedisResult<()> = redis.hset_nx(hash_name, key, value);
     if let Err(_) = set_result {
-        println!("Cannot set {} in Redis, ignoring", key);
+        warn!("Cannot set {} in Redis, ignoring", key);
     }
 }
 
@@ -211,6 +213,7 @@ fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
 }
 
 fn main() {
+    env_logger::init().expect("Could not initialize env_logger!");
     let server = Server::http(&format!("0.0.0.0:{}", server_port())[..])
                      .expect("Could not create server!");
     server.handle(|req: Request, mut res: Response| {
