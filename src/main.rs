@@ -66,6 +66,13 @@ fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> Strin
     value.to_owned()
 }
 
+fn redis_cache_hash_value(redis: &redis::Connection, hash_name: &str, key: &str, value: &str) {
+    let set_result: redis::RedisResult<()> = redis.hset_nx(hash_name, key, value);
+    if let Err(_) = set_result {
+        println!("Cannot set {} in Redis, ignoring", key);
+    }
+}
+
 fn latest_buildpack_release(http: &HTTPClient, maybe_redis: &Option<redis::Connection>) -> String {
     if let Some(ref redis) = *maybe_redis {
         if let Ok(buildpack_release) = redis.get("latest_buildpack_release") {
@@ -79,13 +86,32 @@ fn latest_buildpack_release(http: &HTTPClient, maybe_redis: &Option<redis::Conne
     }
 }
 
+fn cached_version_from_buildpack_release(buildpack_release: &str,
+                                         maybe_redis: &Option<redis::Connection>)
+                                         -> Option<String> {
+    if let Some(ref redis) = *maybe_redis {
+        if let Ok(version) = redis.hget("bundler_version", buildpack_release) {
+            Some(version)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
 fn bundler_version_from_ruby_buildpack(http: &HTTPClient,
                                        maybe_redis: Option<redis::Connection>)
                                        -> Option<String> {
+    let buildpack_release = latest_buildpack_release(&http, &maybe_redis);
+    if let Some(cached_version) = cached_version_from_buildpack_release(&buildpack_release[..],
+                                                                        &maybe_redis) {
+        return Some(cached_version);
+    }
     let ruby_langpack_url = format!("https://raw.githubusercontent.com/\
                                      heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
                                      ruby.rb",
-                                    latest_buildpack_release(&http, &maybe_redis));
+                                    buildpack_release);
     let ruby_file = &download_url(&http, &ruby_langpack_url[..])
                          .expect("Could not download ruby.rb!")[..];
     let regex = Regex::new(r#"BUNDLER_VERSION += "(.+?)""#).expect("Invalid regular expression!");
@@ -93,7 +119,8 @@ fn bundler_version_from_ruby_buildpack(http: &HTTPClient,
         let captures = regex.captures(ruby_file).expect("Could not match?!");
         let version = captures.at(1).expect("Capture not found?!");
         if let Some(redis) = maybe_redis {
-            redis_cache_value(&redis, "new_bundler_version", version);
+            redis_cache_hash_value(&redis, "bundler_version", &buildpack_release[..], version);
+            redis_cache_value(&redis, "latest_supported_bundler_version", version);
         }
         Some(version.to_owned())
     } else {
@@ -105,7 +132,7 @@ fn is_bundler_upgraded(http: &HTTPClient,
                        redis_result: redis::RedisResult<redis::Connection>)
                        -> bool {
     let bundler_version_result = if let Ok(redis) = redis_result {
-        match redis.get("new_bundler_version") {
+        match redis.get("latest_supported_bundler_version") {
             Ok(version) => Some(version),
             _ => bundler_version_from_ruby_buildpack(&http, Some(redis)),
         }
@@ -179,8 +206,7 @@ fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
         let client = redis::Client::open(&redis_url[..]).expect("Cannot connect to Redis");
         client.get_connection()
     } else {
-        Err(redis::RedisError::from(io::Error::new(io::ErrorKind::Other,
-                                                   "REDIS_URL not found")))
+        Err(redis::RedisError::from(io::Error::new(io::ErrorKind::Other, "REDIS_URL not found")))
     }
 }
 
@@ -188,28 +214,28 @@ fn main() {
     let server = Server::http(&format!("0.0.0.0:{}", server_port())[..])
                      .expect("Could not create server!");
     server.handle(|req: Request, mut res: Response| {
-        if let AbsolutePath(ref path) = req.uri {
-            if *path == "/" {
-                if req.method == Get {
-                    let http = HTTPClient::new();
-                    let redis = connect_to_redis();
-                    let result = is_bundler_upgraded(&http, redis);
-                    let content_type = determine_content_type(&req);
-                    let data = match &format!("{}", content_type)[..] {
-                        "application/json; charset=utf-8" => result_to_json(result),
-                        _ => result_to_html(result),
-                    };
-                    res.headers_mut().set(content_type);
-                    res.send(data.as_bytes()).expect("Could not set response body!");
-                } else {
-                    *res.status_mut() = hyper::status::StatusCode::MethodNotAllowed;
-                }
-            } else {
-                *res.status_mut() = hyper::NotFound;
-            }
-        } else {
-            *res.status_mut() = hyper::BadRequest;
-        }
-    })
-    .expect("Could not set up HTTP request handler!");
+              if let AbsolutePath(ref path) = req.uri {
+                  if *path == "/" {
+                      if req.method == Get {
+                          let http = HTTPClient::new();
+                          let redis = connect_to_redis();
+                          let result = is_bundler_upgraded(&http, redis);
+                          let content_type = determine_content_type(&req);
+                          let data = match &format!("{}", content_type)[..] {
+                              "application/json; charset=utf-8" => result_to_json(result),
+                              _ => result_to_html(result),
+                          };
+                          res.headers_mut().set(content_type);
+                          res.send(data.as_bytes()).expect("Could not set response body!");
+                      } else {
+                          *res.status_mut() = hyper::status::StatusCode::MethodNotAllowed;
+                      }
+                  } else {
+                      *res.status_mut() = hyper::NotFound;
+                  }
+              } else {
+                  *res.status_mut() = hyper::BadRequest;
+              }
+          })
+          .expect("Could not set up HTTP request handler!");
 }
