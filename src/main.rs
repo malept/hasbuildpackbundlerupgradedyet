@@ -15,7 +15,8 @@
 
 extern crate env_logger;
 extern crate hyper;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate redis;
 extern crate regex;
 extern crate rquery;
@@ -212,33 +213,34 @@ fn connect_to_redis() -> redis::RedisResult<redis::Connection> {
     }
 }
 
+fn request_handler(req: Request, mut res: Response) {
+    if let AbsolutePath(ref path) = req.uri {
+        if *path == "/" {
+            if req.method == Get {
+                let http = HTTPClient::new();
+                let redis = connect_to_redis();
+                let result = is_bundler_upgraded(&http, redis);
+                let content_type = determine_content_type(&req);
+                let data = match &format!("{}", content_type)[..] {
+                    "application/json; charset=utf-8" => result_to_json(result),
+                    _ => result_to_html(result),
+                };
+                res.headers_mut().set(content_type);
+                res.send(data.as_bytes()).expect("Could not set response body!");
+            } else {
+                *res.status_mut() = hyper::status::StatusCode::MethodNotAllowed;
+            }
+        } else {
+            *res.status_mut() = hyper::NotFound;
+        }
+    } else {
+        *res.status_mut() = hyper::BadRequest;
+    }
+}
+
 fn main() {
     env_logger::init().expect("Could not initialize env_logger!");
     let server = Server::http(&format!("0.0.0.0:{}", server_port())[..])
                      .expect("Could not create server!");
-    server.handle(|req: Request, mut res: Response| {
-              if let AbsolutePath(ref path) = req.uri {
-                  if *path == "/" {
-                      if req.method == Get {
-                          let http = HTTPClient::new();
-                          let redis = connect_to_redis();
-                          let result = is_bundler_upgraded(&http, redis);
-                          let content_type = determine_content_type(&req);
-                          let data = match &format!("{}", content_type)[..] {
-                              "application/json; charset=utf-8" => result_to_json(result),
-                              _ => result_to_html(result),
-                          };
-                          res.headers_mut().set(content_type);
-                          res.send(data.as_bytes()).expect("Could not set response body!");
-                      } else {
-                          *res.status_mut() = hyper::status::StatusCode::MethodNotAllowed;
-                      }
-                  } else {
-                      *res.status_mut() = hyper::NotFound;
-                  }
-              } else {
-                  *res.status_mut() = hyper::BadRequest;
-              }
-          })
-          .expect("Could not set up HTTP request handler!");
+    server.handle(request_handler).expect("Could not set up HTTP request handler!");
 }
