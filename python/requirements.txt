@@ -1,0 +1,6 @@
+gunicorn
+lxml
+redis
+requests
+semver
+Werkzeug
