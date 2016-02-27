@@ -17,8 +17,8 @@ redis = "0.5"
 regex = "0.1"
 rquery = "0.2"
 semver = "0.2"
-serde = "0.6"
-serde_json = "0.6"
+serde = "0.7"
+serde_json = "0.7"
 
 clippy = { version = "*", optional = true }
 
