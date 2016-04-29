@@ -39,7 +39,7 @@ use std::io;
 use std::io::Read;
 
 const DEFAULT_SERVER_PORT: u32 = 9000;
-const MIN_BUNDLER_VERSION: &'static str = "1.11.0";
+const MIN_BUNDLER_VERSION: &'static str = "1.12.0";
 const RUBY_LANGPACK_RELEASES_URL: &'static str = "https://github.\
                                                   com/heroku/heroku-buildpack-ruby/releases.atom";
 
