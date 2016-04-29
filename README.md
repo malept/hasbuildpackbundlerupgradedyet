@@ -4,7 +4,7 @@
 [![Windows Build Status (AppVeyor)](https://ci.appveyor.com/api/projects/status/eqy5m69di4luooge?svg=true)](https://ci.appveyor.com/project/malept/hasbuildpackbundlerupgradedyet)
 
 This is a example [Rust](https://www.rust-lang.org/) web application that tells you if the latest
-released Ruby buildpack for Heroku comes with a version of [Bundler](http://bundler.io/) ≥ 1.11.
+released Ruby buildpack for Heroku comes with a certain version of [Bundler](http://bundler.io/).
 
 ## Legal
 
