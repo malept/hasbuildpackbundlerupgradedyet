@@ -1,6 +1,6 @@
 [package]
 name = "hasbuildpackbundlerupgradedyet"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Mark Lee"]
 license = "AGPL-3.0"
 
