@@ -21,6 +21,3 @@ serde = "0.7"
 serde_json = "0.7"
 
 clippy = { version = "*", optional = true }
-
-[target.heroku]
-version = "stable"
