@@ -11,9 +11,9 @@ lint = ["clippy"]
 [dependencies]
 
 env_logger = "0.3"
-hyper = "0.7"
+hyper = "0.9"
 log = "0.3"
-redis = "0.5"
+redis = { git = "https://github.com/mitsuhiko/redis-rs", rev = "9c6c2b0" }
 regex = "0.1"
 rquery = "0.2"
 semver = "0.2"
