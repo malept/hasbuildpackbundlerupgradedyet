@@ -1,6 +1,6 @@
 [package]
 name = "hasbuildpackbundlerupgradedyet"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Mark Lee"]
 license = "AGPL-3.0"
 
@@ -13,7 +13,7 @@ lint = ["clippy"]
 env_logger = "0.3"
 hyper = "0.9"
 log = "0.3"
-redis = { git = "https://github.com/mitsuhiko/redis-rs", rev = "9c6c2b0" }
+redis = "0.5"
 regex = "0.1"
 rquery = "0.2"
 semver = "0.2"
