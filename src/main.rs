@@ -39,7 +39,7 @@ use std::io;
 use std::io::Read;
 
 const DEFAULT_SERVER_PORT: u32 = 9000;
-const MIN_BUNDLER_VERSION: &'static str = "1.12.0";
+const DEFAULT_MIN_BUNDLER_VERSION: &'static str = "1.12.0";
 const RUBY_LANGPACK_RELEASES_URL: &'static str = "https://github.\
                                                   com/heroku/heroku-buildpack-ruby/releases.atom";
 
@@ -135,7 +135,7 @@ fn is_bundler_upgraded(http: &HTTPClient,
                        -> bool {
     let bundler_version_result = bundler_version_from_ruby_buildpack(&http, &redis_result);
     if let Some(buildpack_bundler_version_str) = bundler_version_result {
-        let min_version = Version::parse(MIN_BUNDLER_VERSION)
+        let min_version = Version::parse(&min_bundler_version()[..])
                               .expect("Could not parse min version!");
         let new_version = Version::parse(&buildpack_bundler_version_str[..])
                               .expect("Could not parse new version!");
@@ -183,9 +183,16 @@ fn result_to_html(result: bool) -> String {
             let mut html = String::new();
             html_file.read_to_string(&mut html).expect("Could not read HTML file!");
             html.replace("{{ is_bundler_upgraded }}", result_str)
-                .replace("{{ MIN_BUNDLER_VERSION }}", MIN_BUNDLER_VERSION)
+                .replace("{{ MIN_BUNDLER_VERSION }}", &min_bundler_version()[..])
         }
         Err(error) => format!("HTML NOT FOUND: {}", error),
+    }
+}
+
+fn min_bundler_version() -> String {
+    match env::var("MIN_BUNDLER_VERSION") {
+        Ok(version) => version,
+        _ => String::from(DEFAULT_MIN_BUNDLER_VERSION),
     }
 }
 
