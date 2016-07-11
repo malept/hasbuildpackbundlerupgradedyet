@@ -6,6 +6,8 @@
 This is a example [Rust](https://www.rust-lang.org/) web application that tells you if the latest
 released Ruby buildpack for Heroku comes with a certain version of [Bundler](http://bundler.io/).
 
+## [Benchmarks](https://github.com/malept/hasbuildpackbundlerupgradedyet/blob/master/BENCHMARKS.md)
+
 ## Legal
 
 This application is copyrighted under the [GNU Affero General Public License (GNU AGPL), version
