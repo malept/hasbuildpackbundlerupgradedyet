@@ -11,10 +11,11 @@ lint = ["clippy"]
 [dependencies]
 
 env_logger = "0.3"
-hyper = "0.9"
+hyper = "0.10   "
 log = "0.3"
 redis = "0.5"
 regex = "0.1"
+reqwest = "0.3"
 rquery = "0.2"
 semver = "0.2"
 serde = "0.7"
