@@ -54,11 +54,10 @@ fn download_url(url: &str) -> io::Result<String> {
 }
 
 fn download_latest_buildpack_release() -> String {
-    let xml = download_url(RUBY_LANGPACK_RELEASES_URL)
-                  .expect("Could not download Atom releases!");
+    let xml = download_url(RUBY_LANGPACK_RELEASES_URL).expect("Could not download Atom releases!");
     let atom_doc = Document::new_from_xml_string(&xml[..]).expect("Could not parse Atom releases!");
     let latest_tag = atom_doc.select("entry title")
-                             .expect("Could not find latest buildpack tag!");
+        .expect("Could not find latest buildpack tag!");
     latest_tag.text().clone()
 }
 
@@ -107,16 +106,15 @@ fn cached_version_from_buildpack_release(buildpack_release: &str,
 fn bundler_version_from_ruby_buildpack(redis_result: &RedisResult<redis::Connection>)
                                        -> Option<String> {
     let buildpack_release = latest_buildpack_release(redis_result);
-    if let Some(cached_version) = cached_version_from_buildpack_release(&buildpack_release[..],
-                                                                        redis_result) {
+    if let Some(cached_version) =
+        cached_version_from_buildpack_release(&buildpack_release[..], redis_result) {
         return Some(cached_version);
     }
     let ruby_langpack_url = format!("https://raw.githubusercontent.com/\
                                      heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
                                      ruby.rb",
                                     buildpack_release);
-    let ruby_file = &download_url(&ruby_langpack_url[..])
-                         .expect("Could not download ruby.rb!")[..];
+    let ruby_file = &download_url(&ruby_langpack_url[..]).expect("Could not download ruby.rb!")[..];
     let regex = Regex::new(r#"BUNDLER_VERSION += "(.+?)""#).expect("Invalid regular expression!");
     if regex.is_match(ruby_file) {
         let captures = regex.captures(ruby_file).expect("Could not match?!");
@@ -130,14 +128,13 @@ fn bundler_version_from_ruby_buildpack(redis_result: &RedisResult<redis::Connect
     }
 }
 
-fn is_bundler_upgraded(redis_result: RedisResult<redis::Connection>)
-                       -> bool {
+fn is_bundler_upgraded(redis_result: RedisResult<redis::Connection>) -> bool {
     let bundler_version_result = bundler_version_from_ruby_buildpack(&redis_result);
     if let Some(buildpack_bundler_version_str) = bundler_version_result {
         let min_version = Version::parse(&min_bundler_version()[..])
-                              .expect("Could not parse min version!");
+            .expect("Could not parse min version!");
         let new_version = Version::parse(&buildpack_bundler_version_str[..])
-                              .expect("Could not parse new version!");
+            .expect("Could not parse new version!");
         min_version < new_version
     } else {
         false
@@ -238,6 +235,6 @@ fn request_handler(req: Request, mut res: Response) {
 fn main() {
     env_logger::init().expect("Could not initialize env_logger!");
     let server = Server::http(&format!("0.0.0.0:{}", server_port())[..])
-                     .expect("Could not create server!");
+        .expect("Could not create server!");
     server.handle(request_handler).expect("Could not set up HTTP request handler!");
 }
