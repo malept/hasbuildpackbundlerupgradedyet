@@ -118,7 +118,8 @@ fn bundler_version_from_ruby_buildpack(redis_result: &RedisResult<redis::Connect
     let regex = Regex::new(r#"BUNDLER_VERSION += "(.+?)""#).expect("Invalid regular expression!");
     if regex.is_match(ruby_file) {
         let captures = regex.captures(ruby_file).expect("Could not match?!");
-        let version = captures.at(1).expect("Capture not found?!");
+        let version_match = captures.get(1).expect("Capture not found?!");
+        let version = version_match.as_str();
         if let Ok(ref redis) = *redis_result {
             redis_cache_hash_value(&redis, "bundler_version", &buildpack_release[..], version);
         }
