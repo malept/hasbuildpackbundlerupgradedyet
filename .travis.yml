@@ -15,8 +15,10 @@ os:
   - osx
 
 cache:
-  apt: true
-  cargo: true
+  directories:
+  - $HOME/.cache/pip
+  - $HOME/.cargo
+  - $TRAVIS_BUILD_DIR/target
 
 rust:
   - nightly
