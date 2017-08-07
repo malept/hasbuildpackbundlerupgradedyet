@@ -56,8 +56,9 @@ fn download_url(url: &str) -> io::Result<String> {
 fn download_latest_buildpack_release() -> String {
     let xml = download_url(RUBY_LANGPACK_RELEASES_URL).expect("Could not download Atom releases!");
     let atom_doc = Document::new_from_xml_string(&xml[..]).expect("Could not parse Atom releases!");
-    let latest_tag = atom_doc.select("entry title")
-        .expect("Could not find latest buildpack tag!");
+    let latest_tag = atom_doc.select("entry title").expect(
+        "Could not find latest buildpack tag!",
+    );
     latest_tag.text().clone()
 }
 
@@ -89,9 +90,10 @@ fn latest_buildpack_release(redis_result: &RedisResult<redis::Connection>) -> St
     }
 }
 
-fn cached_version_from_buildpack_release(buildpack_release: &str,
-                                         redis_result: &RedisResult<redis::Connection>)
-                                         -> Option<String> {
+fn cached_version_from_buildpack_release(
+    buildpack_release: &str,
+    redis_result: &RedisResult<redis::Connection>,
+) -> Option<String> {
     if let Ok(ref redis) = *redis_result {
         if let Ok(version) = redis.hget("bundler_version", buildpack_release) {
             Some(version)
@@ -103,17 +105,21 @@ fn cached_version_from_buildpack_release(buildpack_release: &str,
     }
 }
 
-fn bundler_version_from_ruby_buildpack(redis_result: &RedisResult<redis::Connection>)
-                                       -> Option<String> {
+fn bundler_version_from_ruby_buildpack(
+    redis_result: &RedisResult<redis::Connection>,
+) -> Option<String> {
     let buildpack_release = latest_buildpack_release(redis_result);
     if let Some(cached_version) =
-        cached_version_from_buildpack_release(&buildpack_release[..], redis_result) {
+        cached_version_from_buildpack_release(&buildpack_release[..], redis_result)
+    {
         return Some(cached_version);
     }
-    let ruby_langpack_url = format!("https://raw.githubusercontent.com/\
+    let ruby_langpack_url = format!(
+        "https://raw.githubusercontent.com/\
                                      heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
                                      ruby.rb",
-                                    buildpack_release);
+        buildpack_release
+    );
     let ruby_file = &download_url(&ruby_langpack_url[..]).expect("Could not download ruby.rb!")[..];
     let regex = Regex::new(r#"BUNDLER_VERSION += "(.+?)""#).expect("Invalid regular expression!");
     if regex.is_match(ruby_file) {
@@ -132,10 +138,11 @@ fn bundler_version_from_ruby_buildpack(redis_result: &RedisResult<redis::Connect
 fn is_bundler_upgraded(redis_result: RedisResult<redis::Connection>) -> bool {
     let bundler_version_result = bundler_version_from_ruby_buildpack(&redis_result);
     if let Some(buildpack_bundler_version_str) = bundler_version_result {
-        let min_version = Version::parse(&min_bundler_version()[..])
-            .expect("Could not parse min version!");
-        let new_version = Version::parse(&buildpack_bundler_version_str[..])
-            .expect("Could not parse new version!");
+        let min_version =
+            Version::parse(&min_bundler_version()[..]).expect("Could not parse min version!");
+        let new_version = Version::parse(&buildpack_bundler_version_str[..]).expect(
+            "Could not parse new version!",
+        );
         min_version < new_version
     } else {
         false
@@ -178,7 +185,9 @@ fn result_to_html(result: bool) -> String {
     match File::open("index.html") {
         Ok(mut html_file) => {
             let mut html = String::new();
-            html_file.read_to_string(&mut html).expect("Could not read HTML file!");
+            html_file.read_to_string(&mut html).expect(
+                "Could not read HTML file!",
+            );
             html.replace("{{ is_bundler_upgraded }}", result_str)
                 .replace("{{ MIN_BUNDLER_VERSION }}", &min_bundler_version()[..])
         }
@@ -205,7 +214,9 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
         let client = redis::Client::open(&redis_url[..]).expect("Cannot connect to Redis");
         client.get_connection()
     } else {
-        Err(RedisError::from(io::Error::new(io::ErrorKind::Other, "REDIS_URL not found")))
+        Err(RedisError::from(
+            io::Error::new(io::ErrorKind::Other, "REDIS_URL not found"),
+        ))
     }
 }
 
@@ -221,7 +232,9 @@ fn request_handler(req: Request, mut res: Response) {
                     _ => result_to_html(result),
                 };
                 res.headers_mut().set(content_type);
-                res.send(data.as_bytes()).expect("Could not set response body!");
+                res.send(data.as_bytes()).expect(
+                    "Could not set response body!",
+                );
             } else {
                 *res.status_mut() = hyper::status::StatusCode::MethodNotAllowed;
             }
@@ -237,5 +250,7 @@ fn main() {
     env_logger::init().expect("Could not initialize env_logger!");
     let server = Server::http(&format!("0.0.0.0:{}", server_port())[..])
         .expect("Could not create server!");
-    server.handle(request_handler).expect("Could not set up HTTP request handler!");
+    server.handle(request_handler).expect(
+        "Could not set up HTTP request handler!",
+    );
 }
