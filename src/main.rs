@@ -64,7 +64,7 @@ fn download_latest_buildpack_release() -> String {
 
 fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> String {
     let set_result: RedisResult<()> = redis.set_ex(key, value, 3600);
-    if let Err(_) = set_result {
+    if set_result.is_err() {
         warn!("Cannot set {} in Redis, ignoring", key);
     }
     value.to_owned()
@@ -72,7 +72,7 @@ fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> Strin
 
 fn redis_cache_hash_value(redis: &redis::Connection, hash_name: &str, key: &str, value: &str) {
     let set_result: RedisResult<()> = redis.hset_nx(hash_name, key, value);
-    if let Err(_) = set_result {
+    if set_result.is_err() {
         warn!("Cannot set {} in Redis, ignoring", key);
     }
 }
@@ -127,7 +127,7 @@ fn bundler_version_from_ruby_buildpack(
         let version_match = captures.get(1).expect("Capture not found?!");
         let version = version_match.as_str();
         if let Ok(ref redis) = *redis_result {
-            redis_cache_hash_value(&redis, "bundler_version", &buildpack_release[..], version);
+            redis_cache_hash_value(redis, "bundler_version", &buildpack_release[..], version);
         }
         Some(version.to_owned())
     } else {
@@ -135,8 +135,8 @@ fn bundler_version_from_ruby_buildpack(
     }
 }
 
-fn is_bundler_upgraded(redis_result: RedisResult<redis::Connection>) -> bool {
-    let bundler_version_result = bundler_version_from_ruby_buildpack(&redis_result);
+fn is_bundler_upgraded(redis_result: &RedisResult<redis::Connection>) -> bool {
+    let bundler_version_result = bundler_version_from_ruby_buildpack(redis_result);
     if let Some(buildpack_bundler_version_str) = bundler_version_result {
         let min_version =
             Version::parse(&min_bundler_version()[..]).expect("Could not parse min version!");
@@ -225,7 +225,7 @@ fn request_handler(req: Request, mut res: Response) {
         if *path == "/" {
             if req.method == Get {
                 let redis = connect_to_redis();
-                let result = is_bundler_upgraded(redis);
+                let result = is_bundler_upgraded(&redis);
                 let content_type = determine_content_type(&req);
                 let data = match &format!("{}", content_type)[..] {
                     "application/json; charset=utf-8" => result_to_json(result),
