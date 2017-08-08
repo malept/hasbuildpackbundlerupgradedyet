@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 extern crate env_logger;
+extern crate futures;
 extern crate hyper;
 #[macro_use]
 extern crate log;
@@ -25,10 +26,9 @@ extern crate semver;
 extern crate serde;
 extern crate serde_json;
 
-use hyper::{Get, Server};
+use hyper::{Get, StatusCode};
 use hyper::header::{Accept, ContentType};
-use hyper::server::{Request, Response};
-use hyper::uri::RequestUri::AbsolutePath;
+use hyper::server::{Http, Request, Response, Service};
 use redis::{Commands, RedisError, RedisResult};
 use regex::Regex;
 use rquery::Document;
@@ -149,16 +149,16 @@ fn is_bundler_upgraded(redis_result: &RedisResult<redis::Connection>) -> bool {
     }
 }
 
-fn determine_content_type(req: &Request) -> ContentType {
-    if let Some(accept) = req.headers.get::<Accept>() {
-        let mut use_json = false;
-        for qitem in &accept.0 {
-            let qitem_str = &format!("{}", qitem)[..];
-            if qitem_str == "application/json" {
-                use_json = true;
-                break;
-            }
-        }
+fn determine_content_type(headers: &hyper::Headers) -> ContentType {
+    use std::ops::Deref;
+    if headers.has::<Accept>() {
+        let accept = headers
+            .get::<Accept>()
+            .expect("Accept header not found?!")
+            .deref();
+        let use_json = accept.into_iter().any(
+            |qitem| qitem.item == "application/json",
+        );
 
         if use_json {
             ContentType::json()
@@ -220,37 +220,45 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
     }
 }
 
-fn request_handler(req: Request, mut res: Response) {
-    if let AbsolutePath(ref path) = req.uri {
-        if *path == "/" {
-            if req.method == Get {
+struct HBBUYServer;
+
+impl Service for HBBUYServer {
+    type Request = Request;
+    type Response = Response;
+    type Error = hyper::Error;
+    type Future = futures::future::FutureResult<Self::Response, Self::Error>;
+
+    fn call(&self, req: Request) -> Self::Future {
+        let response = match (req.uri().path(), req.method()) {
+            ("/", &Get) => {
                 let redis = connect_to_redis();
                 let result = is_bundler_upgraded(&redis);
-                let content_type = determine_content_type(&req);
+                let content_type = determine_content_type(req.headers());
                 let data = match &format!("{}", content_type)[..] {
                     "application/json; charset=utf-8" => result_to_json(result),
                     _ => result_to_html(result),
                 };
-                res.headers_mut().set(content_type);
-                res.send(data.as_bytes()).expect(
-                    "Could not set response body!",
-                );
-            } else {
-                *res.status_mut() = hyper::status::StatusCode::MethodNotAllowed;
+
+                Response::new().with_header(content_type).with_body(data)
             }
-        } else {
-            *res.status_mut() = hyper::NotFound;
-        }
-    } else {
-        *res.status_mut() = hyper::BadRequest;
+            (_, &Get) => Response::new().with_status(StatusCode::NotFound),
+            (_, _) => Response::new().with_status(StatusCode::MethodNotAllowed),
+        };
+
+        futures::future::ok(response)
     }
 }
 
+
 fn main() {
     env_logger::init().expect("Could not initialize env_logger!");
-    let server = Server::http(&format!("0.0.0.0:{}", server_port())[..])
-        .expect("Could not create server!");
-    server.handle(request_handler).expect(
+    let addr = format!("0.0.0.0:{}", server_port()).parse().expect(
+        "Could not parse address/port",
+    );
+    let server = Http::new().bind(&addr, || Ok(HBBUYServer)).expect(
+        "Could not create server!",
+    );
+    server.run().expect(
         "Could not set up HTTP request handler!",
     );
 }
