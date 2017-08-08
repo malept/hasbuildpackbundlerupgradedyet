@@ -43,7 +43,7 @@ def latest_buildpack_release(redis):
     releases = requests.get(RUBY_LANGPACK_RELEASES_URL).text
     xml = etree.fromstring(releases.encode('utf-8'))
     nsmap = {'atom': xml.nsmap[None]}
-    release = xml.xpath('atom:entry/atom:title/text()', namespaces=nsmap)[0]
+    release = xml.xpath('atom:entry/atom:id/text()', namespaces=nsmap)[0].rsplit('/', 1)[1]
     if redis:
         redis.setex('latest_buildpack_release', 3600, release)
     return release

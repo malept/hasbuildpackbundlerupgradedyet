@@ -56,10 +56,14 @@ fn download_url(url: &str) -> io::Result<String> {
 fn download_latest_buildpack_release() -> String {
     let xml = download_url(RUBY_LANGPACK_RELEASES_URL).expect("Could not download Atom releases!");
     let atom_doc = Document::new_from_xml_string(&xml[..]).expect("Could not parse Atom releases!");
-    let latest_tag = atom_doc.select("entry title").expect(
-        "Could not find latest buildpack tag!",
-    );
-    latest_tag.text().clone()
+    atom_doc
+        .select("entry id")
+        .expect("Could not find latest buildpack tag!")
+        .text()
+        .rsplitn(2, '/')
+        .next()
+        .expect("No slashes in the GitHub release ID!")
+        .to_string()
 }
 
 fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> String {

@@ -49,7 +49,7 @@ class HasBuildpackBundlerUpgradedYet
     releases = http_get(RUBY_LANGPACK_RELEASES_URL)
     xml = Nokogiri::XML(releases)
     xml.remove_namespaces!
-    release = xml.xpath('/feed/entry/title/text()').first
+    release = xml.xpath('/feed/entry/id/text()').first.to_s.split('/').last
     redis&.setex('latest_buildpack_release', 3600, release)
 
     release
