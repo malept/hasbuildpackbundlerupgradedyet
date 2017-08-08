@@ -1,4 +1,4 @@
-// Copyright (C) 2016 Mark Lee
+// Copyright (C) 2016, 2017 Mark Lee
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -152,13 +152,10 @@ fn is_bundler_upgraded(redis_result: &RedisResult<redis::Connection>) -> bool {
 fn determine_content_type(headers: &hyper::Headers) -> ContentType {
     use std::ops::Deref;
     if headers.has::<Accept>() {
-        let accept = headers
-            .get::<Accept>()
-            .expect("Accept header not found?!")
-            .deref();
-        let use_json = accept.into_iter().any(
-            |qitem| qitem.item == "application/json",
-        );
+        let accept = headers.get::<Accept>().expect("Accept header not found?!").deref();
+        let use_json = accept.into_iter().any(|qitem| {
+            qitem.item == "application/json"
+        });
 
         if use_json {
             ContentType::json()
@@ -239,8 +236,10 @@ impl Service for HBBUYServer {
                     _ => result_to_html(result),
                 };
 
-                Response::new().with_header(content_type).with_body(data)
-            }
+                Response::new()
+                    .with_header(content_type)
+                    .with_body(data)
+            },
             (_, &Get) => Response::new().with_status(StatusCode::NotFound),
             (_, _) => Response::new().with_status(StatusCode::MethodNotAllowed),
         };
@@ -252,12 +251,9 @@ impl Service for HBBUYServer {
 
 fn main() {
     env_logger::init().expect("Could not initialize env_logger!");
-    let addr = format!("0.0.0.0:{}", server_port()).parse().expect(
-        "Could not parse address/port",
-    );
-    let server = Http::new().bind(&addr, || Ok(HBBUYServer)).expect(
-        "Could not create server!",
-    );
+    let addr = format!("0.0.0.0:{}", server_port()).parse().expect("Could not parse address/port");
+    let server = Http::new().bind(&addr, || Ok(HBBUYServer))
+        .expect("Could not create server!");
     server.run().expect(
         "Could not set up HTTP request handler!",
     );
