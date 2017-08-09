@@ -1,16 +1,14 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    json (2.0.1)
-    mini_portile2 (2.1.0)
-    nokogiri (1.6.8)
-      mini_portile2 (~> 2.1.0)
-      pkg-config (~> 1.1.7)
-    pkg-config (1.1.7)
+    json (2.1.0)
+    mini_portile2 (2.2.0)
+    nokogiri (1.8.0)
+      mini_portile2 (~> 2.2.0)
     puma (3.9.1)
-    rack (2.0.1)
-    redis (3.3.0)
-    semverse (1.2.1)
+    rack (2.0.3)
+    redis (3.3.3)
+    semverse (2.0.0)
 
 PLATFORMS
   ruby
