@@ -239,7 +239,7 @@ impl Service for HBBUYServer {
                 let result = is_bundler_upgraded(&redis);
                 let content_type = determine_content_type(req.headers());
                 let data = match &format!("{}", content_type)[..] {
-                    "application/json; charset=utf-8" => result_to_json(result),
+                    "application/json" => result_to_json(result),
                     _ => result_to_html(result),
                 };
 
