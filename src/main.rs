@@ -40,9 +40,9 @@ use std::io;
 use std::io::Read;
 
 const DEFAULT_SERVER_PORT: u32 = 9000;
-const DEFAULT_MIN_BUNDLER_VERSION: &'static str = "1.12.0";
-const RUBY_LANGPACK_RELEASES_URL: &'static str = "https://github.\
-                                                  com/heroku/heroku-buildpack-ruby/releases.atom";
+const DEFAULT_MIN_BUNDLER_VERSION: &str = "1.12.0";
+const RUBY_LANGPACK_RELEASES_URL: &str =
+    "https://github.com/heroku/heroku-buildpack-ruby/releases.atom";
 
 fn download_url(url: &str) -> io::Result<String> {
     let mut resp = reqwest::get(url).expect("Could not send HTTP request");
