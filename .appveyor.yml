@@ -27,13 +27,13 @@ cache:
   - '%USERPROFILE%\.cargo'
 install:
   - ps: |
-        $env:PATH += ";C:\rust\bin";
+        $env:PATH += ";${env:USERPROFILE}\.cargo\bin";
         if ($env:platform -eq 'x86') {
-          $arch_expanded = "i686-pc-windows-${env:TARGET}";
+          $env:RUST_ARCH = "i686-pc-windows-${env:TARGET}";
           $env:ARCH = "x86";
           $env:bits = "32";
         } else {
-          $arch_expanded = "x86_64-pc-windows-${env:TARGET}";
+          $env:RUST_ARCH = "x86_64-pc-windows-${env:TARGET}";
           $env:ARCH = "amd64";
           $env:bits ="64";
         }
@@ -43,9 +43,8 @@ install:
           $env:PATH += ";C:\msys64\mingw${env:bits}\bin";
           gcc --version;
         }
-
-        Start-FileDownload https://win.rustup.rs -FileName rustup-init.exe
-        .\rustup-init.exe --default-host "${arch_expanded}" --default-toolchain "${env:RUST_VERSION}" -y
+  - appveyor DownloadFile https://win.rustup.rs -FileName rustup-init.exe
+  - rustup-init.exe --default-host %RUST_ARCH% --default-toolchain %RUST_VERSION -y
   - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %ARCH%
   - rustc -vV
   - cargo -vV
