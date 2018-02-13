@@ -12,7 +12,6 @@ if test "$TRAVIS_OS_NAME" = "linux"; then
             cargo fmt -- --write-mode=diff $(git show --format= --name-only "$TRAVIS_COMMIT_RANGE" | sort -u | grep \.rs$)
         fi
     fi
-
 fi
 
 if test "$TRAVIS_RUST_VERSION" = "nightly"; then
