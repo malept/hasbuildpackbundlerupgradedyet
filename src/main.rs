@@ -120,8 +120,8 @@ fn bundler_version_from_ruby_buildpack(
     }
     let ruby_langpack_url = format!(
         "https://raw.githubusercontent.com/\
-                                     heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
-                                     ruby.rb",
+         heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
+         ruby.rb",
         buildpack_release
     );
     let ruby_file = &download_url(&ruby_langpack_url[..]).expect("Could not download ruby.rb!")[..];
@@ -144,9 +144,8 @@ fn is_bundler_upgraded(redis_result: &RedisResult<redis::Connection>) -> bool {
     if let Some(buildpack_bundler_version_str) = bundler_version_result {
         let min_version =
             Version::parse(&min_bundler_version()[..]).expect("Could not parse min version!");
-        let new_version = Version::parse(&buildpack_bundler_version_str[..]).expect(
-            "Could not parse new version!",
-        );
+        let new_version = Version::parse(&buildpack_bundler_version_str[..])
+            .expect("Could not parse new version!");
         min_version < new_version
     } else {
         false
@@ -160,9 +159,9 @@ fn determine_content_type(headers: &hyper::Headers) -> ContentType {
             .get::<Accept>()
             .expect("Accept header not found?!")
             .deref();
-        let use_json = accept.into_iter().any(
-            |qitem| qitem.item == "application/json",
-        );
+        let use_json = accept
+            .into_iter()
+            .any(|qitem| qitem.item == "application/json");
 
         if use_json {
             ContentType::json()
@@ -189,9 +188,9 @@ fn result_to_html(result: bool) -> String {
     match File::open("index.html") {
         Ok(mut html_file) => {
             let mut html = String::new();
-            html_file.read_to_string(&mut html).expect(
-                "Could not read HTML file!",
-            );
+            html_file
+                .read_to_string(&mut html)
+                .expect("Could not read HTML file!");
             html.replace("{{ is_bundler_upgraded }}", result_str)
                 .replace("{{ MIN_BUNDLER_VERSION }}", &min_bundler_version()[..])
         }
@@ -218,9 +217,10 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
         let client = redis::Client::open(&redis_url[..]).expect("Cannot connect to Redis");
         client.get_connection()
     } else {
-        Err(RedisError::from(
-            io::Error::new(io::ErrorKind::Other, "REDIS_URL not found"),
-        ))
+        Err(RedisError::from(io::Error::new(
+            io::ErrorKind::Other,
+            "REDIS_URL not found",
+        )))
     }
 }
 
@@ -253,16 +253,15 @@ impl Service for HBBUYServer {
     }
 }
 
-
 fn main() {
     env_logger::try_init().expect("Could not initialize env_logger!");
-    let addr = format!("0.0.0.0:{}", server_port()).parse().expect(
-        "Could not parse address/port",
-    );
-    let server = Http::new().bind(&addr, || Ok(HBBUYServer)).expect(
-        "Could not create server!",
-    );
-    server.run().expect(
-        "Could not set up HTTP request handler!",
-    );
+    let addr = format!("0.0.0.0:{}", server_port())
+        .parse()
+        .expect("Could not parse address/port");
+    let server = Http::new()
+        .bind(&addr, || Ok(HBBUYServer))
+        .expect("Could not create server!");
+    server
+        .run()
+        .expect("Could not set up HTTP request handler!");
 }
