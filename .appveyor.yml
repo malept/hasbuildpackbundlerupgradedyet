@@ -45,7 +45,7 @@ install:
         }
 
         Start-FileDownload https://win.rustup.rs -FileName rustup-init.exe
-        .\rustup-init.exe --default-host $arch-expanded --default-toolchain $env:RUST_VERSION -y
+        .\rustup-init.exe --default-host "${arch_expanded}" --default-toolchain "${env:RUST_VERSION}" -y
   - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %ARCH%
   - rustc -vV
   - cargo -vV
