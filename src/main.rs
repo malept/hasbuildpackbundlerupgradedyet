@@ -255,7 +255,7 @@ impl Service for HBBUYServer {
 
 
 fn main() {
-    env_logger::init().expect("Could not initialize env_logger!");
+    env_logger::try_init().expect("Could not initialize env_logger!");
     let addr = format!("0.0.0.0:{}", server_port()).parse().expect(
         "Could not parse address/port",
     );
