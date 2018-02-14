@@ -15,7 +15,7 @@ This application is copyrighted under the [GNU Affero General Public License (GN
 
 I do not own the copyright and/or trademark for the following assets:
 
-* Yes/no emojis from [Emoji One](https://github.com/Ranks/emojione), using the Creative Commons
+* Yes/no emojis from [Emoji One](https://github.com/emojione/emojione) (2.x), using the Creative Commons
   Attribution 4.0 International license.
 * GitHub icon from [Octicons](https://github.com/github/octicons), using the SIL Open Font
   License 1.1.
