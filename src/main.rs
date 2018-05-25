@@ -26,9 +26,9 @@ extern crate semver;
 extern crate serde;
 extern crate serde_json;
 
-use hyper::{Get, StatusCode};
 use hyper::header::{Accept, ContentType};
 use hyper::server::{Http, Request, Response, Service};
+use hyper::{Get, StatusCode};
 use redis::{Commands, RedisError, RedisResult};
 use regex::Regex;
 use rquery::Document;
