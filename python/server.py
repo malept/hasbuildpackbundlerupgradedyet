@@ -28,7 +28,7 @@ from werkzeug.wrappers import Request, Response
 INDEX_HTML = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                           '..',
                                           'index.html'))
-MIN_BUNDLER_VERSION = os.environ.get('MIN_BUNDLER_VERSION', '1.12.0')
+MIN_BUNDLER_VERSION = os.environ.get('MIN_BUNDLER_VERSION', '1.16.0')
 REGEX = re.compile(r'BUNDLER_VERSION += "(.+?)"')
 RUBY_LANGPACK_RELEASES_URL = '''\
 https://github.com/heroku/heroku-buildpack-ruby/releases.atom\

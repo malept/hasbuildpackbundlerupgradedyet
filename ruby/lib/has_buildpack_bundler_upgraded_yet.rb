@@ -25,7 +25,7 @@ require 'redis'
 require 'semverse'
 
 INDEX_HTML = File.join(File.dirname(File.dirname(__FILE__)), 'index.html').freeze
-MIN_BUNDLER_VERSION = ENV.fetch('MIN_BUNDLER_VERSION', '1.12.0').freeze
+MIN_BUNDLER_VERSION = ENV.fetch('MIN_BUNDLER_VERSION', '1.16.0').freeze
 REGEX = /BUNDLER_VERSION += "(.+?)"/
 RUBY_LANGPACK_RELEASES_URL = 'https://github.com/heroku/heroku-buildpack-ruby/releases.atom'
 RUBY_LANGPACK_URL = 'https://raw.githubusercontent.com/heroku/heroku-buildpack-ruby/%s/lib/' \
