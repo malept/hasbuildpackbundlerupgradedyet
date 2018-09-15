@@ -22,7 +22,7 @@ rust:
   - beta
   - stable
 
-before_script: rustup component add rustfmt-preview clippy-preview --toolchain=$TRAVIS_RUST_VERSION
+before_script: ci/before_script.sh
 script: ci/script.sh
 
 matrix:
