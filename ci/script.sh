@@ -2,18 +2,14 @@
 
 cargo test
 
-if test "$TRAVIS_OS_NAME" = "linux"; then
-    if test "$TRAVIS_RUST_VERSION" = "stable"; then
-        cargo doc
-    fi
+if test "$TRAVIS_OS_NAME" = "linux" -a "$TRAVIS_RUST_VERSION" = "stable"; then
+    cargo doc
 
     if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
         cargo fmt -- --check $(git diff --name-only "$TRAVIS_COMMIT" "$TRAVIS_BRANCH" | grep \.rs$)
     else
         cargo fmt -- --check $(git show --format= --name-only "$TRAVIS_COMMIT_RANGE" | sort -u | grep \.rs$)
     fi
-fi
 
-if test "$TRAVIS_RUST_VERSION" = "nightly"; then
     cargo clippy -- --allow clippy_pedantic
 fi
