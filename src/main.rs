@@ -27,11 +27,11 @@ extern crate semver;
 extern crate serde;
 extern crate serde_json;
 
-use futures::{Future, future};
-use http::{Method, Request, Response, StatusCode};
+use futures::{future, Future};
 use http::header::{HeaderMap, ACCEPT, CONTENT_TYPE};
-use hyper::{Body, Server};
+use http::{Method, Request, Response, StatusCode};
 use hyper::service::service_fn;
+use hyper::{Body, Server};
 use redis::{Commands, RedisError, RedisResult};
 use regex::Regex;
 use rquery::Document;
@@ -238,10 +238,14 @@ fn response(req: Request<Body>) -> BoxFut {
                 _ => result_to_html(result),
             };
 
-            builder.header(CONTENT_TYPE, content_type).body(Body::from(data))
+            builder
+                .header(CONTENT_TYPE, content_type)
+                .body(Body::from(data))
         }
         (_, &Method::GET) => builder.status(StatusCode::NOT_FOUND).body(Body::empty()),
-        (_, _) => builder.status(StatusCode::METHOD_NOT_ALLOWED).body(Body::empty()),
+        (_, _) => builder
+            .status(StatusCode::METHOD_NOT_ALLOWED)
+            .body(Body::empty()),
     };
 
     Box::new(future::ok(response.expect("Could not build response")))
@@ -253,11 +257,7 @@ fn main() {
         .parse()
         .expect("Could not parse address/port");
     hyper::rt::run(future::lazy(move || {
-        let service = move || {
-            service_fn(move |req| {
-                response(req)
-            })
-        };
+        let service = move || service_fn(move |req| response(req));
 
         Server::bind(&addr)
             .serve(service)
