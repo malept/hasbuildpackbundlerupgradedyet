@@ -1,4 +1,4 @@
-// Copyright (C) 2016, 2017 Mark Lee
+// Copyright (C) 2016, 2017, 2018 Mark Lee
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 
 extern crate env_logger;
 extern crate futures;
+extern crate http;
 extern crate hyper;
 #[macro_use]
 extern crate log;
@@ -26,9 +27,11 @@ extern crate semver;
 extern crate serde;
 extern crate serde_json;
 
-use hyper::header::{Accept, ContentType};
-use hyper::server::{Http, Request, Response, Service};
-use hyper::{Get, StatusCode};
+use futures::{Future, future};
+use http::{Method, Request, Response, StatusCode};
+use http::header::{HeaderMap, ACCEPT, CONTENT_TYPE};
+use hyper::{Body, Server};
+use hyper::service::service_fn;
 use redis::{Commands, RedisError, RedisResult};
 use regex::Regex;
 use rquery::Document;
@@ -152,24 +155,21 @@ fn is_bundler_upgraded(redis_result: &RedisResult<redis::Connection>) -> bool {
     }
 }
 
-fn determine_content_type(headers: &hyper::Headers) -> ContentType {
-    use std::ops::Deref;
-    if headers.has::<Accept>() {
-        let accept = headers
-            .get::<Accept>()
+fn determine_content_type(headers: &HeaderMap) -> &'static str {
+    if headers.contains_key(ACCEPT) {
+        let accept_value = headers
+            .get(ACCEPT)
             .expect("Accept header not found?!")
-            .deref();
-        let use_json = accept
-            .into_iter()
-            .any(|qitem| qitem.item == "application/json");
+            .to_str()
+            .expect("Could not serialize Accept value?!");
 
-        if use_json {
-            ContentType::json()
+        if accept_value.contains("application/json") {
+            "application/json"
         } else {
-            ContentType::html()
+            "text/html"
         }
     } else {
-        ContentType::html()
+        "text/html"
     }
 }
 
@@ -224,33 +224,27 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
     }
 }
 
-struct HBBUYServer;
+type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
-impl Service for HBBUYServer {
-    type Request = Request;
-    type Response = Response;
-    type Error = hyper::Error;
-    type Future = futures::future::FutureResult<Self::Response, Self::Error>;
+fn response(req: Request<Body>) -> BoxFut {
+    let mut builder = Response::builder();
+    let response: http::Result<Response<Body>> = match (req.uri().path(), req.method()) {
+        ("/", &Method::GET) => {
+            let redis = connect_to_redis();
+            let result = is_bundler_upgraded(&redis);
+            let content_type = determine_content_type(req.headers());
+            let data = match &format!("{}", content_type)[..] {
+                "application/json" => result_to_json(result),
+                _ => result_to_html(result),
+            };
 
-    fn call(&self, req: Request) -> Self::Future {
-        let response = match (req.uri().path(), req.method()) {
-            ("/", &Get) => {
-                let redis = connect_to_redis();
-                let result = is_bundler_upgraded(&redis);
-                let content_type = determine_content_type(req.headers());
-                let data = match &format!("{}", content_type)[..] {
-                    "application/json" => result_to_json(result),
-                    _ => result_to_html(result),
-                };
+            builder.header(CONTENT_TYPE, content_type).body(Body::from(data))
+        }
+        (_, &Method::GET) => builder.status(StatusCode::NOT_FOUND).body(Body::empty()),
+        (_, _) => builder.status(StatusCode::METHOD_NOT_ALLOWED).body(Body::empty()),
+    };
 
-                Response::new().with_header(content_type).with_body(data)
-            }
-            (_, &Get) => Response::new().with_status(StatusCode::NotFound),
-            (_, _) => Response::new().with_status(StatusCode::MethodNotAllowed),
-        };
-
-        futures::future::ok(response)
-    }
+    Box::new(future::ok(response.expect("Could not build response")))
 }
 
 fn main() {
@@ -258,10 +252,15 @@ fn main() {
     let addr = format!("0.0.0.0:{}", server_port())
         .parse()
         .expect("Could not parse address/port");
-    let server = Http::new()
-        .bind(&addr, || Ok(HBBUYServer))
-        .expect("Could not create server!");
-    server
-        .run()
-        .expect("Could not set up HTTP request handler!");
+    hyper::rt::run(future::lazy(move || {
+        let service = move || {
+            service_fn(move |req| {
+                response(req)
+            })
+        };
+
+        Server::bind(&addr)
+            .serve(service)
+            .map_err(|e| eprintln!("server error: {}", e))
+    }));
 }
