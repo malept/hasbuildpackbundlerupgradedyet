@@ -3,11 +3,11 @@ GEM
   specs:
     json (2.1.0)
     mini_portile2 (2.3.0)
-    nokogiri (1.8.2)
+    nokogiri (1.8.5)
       mini_portile2 (~> 2.3.0)
-    puma (3.11.2)
-    rack (2.0.4)
-    redis (4.0.1)
+    puma (3.12.0)
+    rack (2.0.6)
+    redis (4.0.3)
     semverse (2.0.0)
 
 PLATFORMS
@@ -22,7 +22,7 @@ DEPENDENCIES
   semverse
 
 RUBY VERSION
-   ruby 2.3.1p112
+   ruby 2.4.3p205
 
 BUNDLED WITH
-   1.16.1
+   1.17.1
