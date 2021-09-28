@@ -114,7 +114,7 @@ class HasBuildpackBundlerUpgradedYet
   end
 
   def error(msg, status)
-    Rack::Response.new(msg, status, 'Content-Type' => 'text/plain')
+    [status, { 'Content-Type' => 'text/plain' }, [msg]]
   end
 
   def call(env)
@@ -131,6 +131,6 @@ class HasBuildpackBundlerUpgradedYet
       return error('JSON or HTML output only', 406) # Not Acceptable
     end
 
-    Rack::Response.new(send(serialize, bundler_upgraded?), 200, 'Content-Type' => mime_type)
+    [200, { 'Content-Type' => mime_type }, [send(serialize, bundler_upgraded?)]]
   end
 end
