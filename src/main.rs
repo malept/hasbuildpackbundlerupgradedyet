@@ -63,8 +63,8 @@ fn download_latest_buildpack_release() -> String {
         .select("entry id")
         .expect("Could not find latest buildpack tag!")
         .text()
-        .rsplitn(2, '/')
-        .next()
+        .rsplit_once('/')
+        .map(|x| x.1)
         .expect("No slashes in the GitHub release ID!")
         .to_string()
 }
@@ -224,7 +224,7 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
     }
 }
 
-type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
+type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
 fn response(req: Request<Body>) -> BoxFut {
     let mut builder = Response::builder();
@@ -233,7 +233,7 @@ fn response(req: Request<Body>) -> BoxFut {
             let redis = connect_to_redis();
             let result = is_bundler_upgraded(&redis);
             let content_type = determine_content_type(req.headers());
-            let data = match &format!("{}", content_type)[..] {
+            let data = match content_type {
                 "application/json" => result_to_json(result),
                 _ => result_to_html(result),
             };
@@ -257,7 +257,7 @@ fn main() {
         .parse()
         .expect("Could not parse address/port");
     hyper::rt::run(future::lazy(move || {
-        let service = move || service_fn(move |req| response(req));
+        let service = move || service_fn(response);
 
         Server::bind(&addr)
             .serve(service)
