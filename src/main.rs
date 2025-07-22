@@ -33,17 +33,18 @@ const DEFAULT_MIN_BUNDLER_VERSION: &str = "1.16.0";
 const RUBY_LANGPACK_RELEASES_URL: &str =
     "https://github.com/heroku/heroku-buildpack-ruby/releases.atom";
 
-fn download_url(url: &str) -> io::Result<String> {
-    let mut resp = reqwest::get(url).expect("Could not send HTTP request");
-    let mut body = String::new();
-    match resp.read_to_string(&mut body) {
-        Err(error) => Err(error),
-        _ => Ok(body),
-    }
+async fn download_url(url: &str) -> reqwest::Result<String> {
+    reqwest::get(url)
+        .await
+        .expect("Could not send HTTP request")
+        .text()
+        .await
 }
 
-fn download_latest_buildpack_release() -> String {
-    let xml = download_url(RUBY_LANGPACK_RELEASES_URL).expect("Could not download Atom releases!");
+async fn download_latest_buildpack_release() -> String {
+    let xml = download_url(RUBY_LANGPACK_RELEASES_URL)
+        .await
+        .expect("Could not download Atom releases!");
     let atom_doc = Document::new_from_xml_string(&xml[..]).expect("Could not parse Atom releases!");
     atom_doc
         .select("entry id")
@@ -70,16 +71,16 @@ fn redis_cache_hash_value(redis: &mut redis::Connection, hash_name: &str, key: &
     }
 }
 
-fn latest_buildpack_release(redis_result: &mut RedisResult<redis::Connection>) -> String {
+async fn latest_buildpack_release(redis_result: &mut RedisResult<redis::Connection>) -> String {
     if let Ok(ref mut redis) = *redis_result {
         if let Ok(buildpack_release) = redis.get("latest_buildpack_release") {
             buildpack_release
         } else {
-            let buildpack_release = download_latest_buildpack_release();
+            let buildpack_release = download_latest_buildpack_release().await;
             redis_cache_value(redis, "latest_buildpack_release", &buildpack_release[..])
         }
     } else {
-        download_latest_buildpack_release()
+        download_latest_buildpack_release().await
     }
 }
 
@@ -98,10 +99,10 @@ fn cached_version_from_buildpack_release(
     }
 }
 
-fn bundler_version_from_ruby_buildpack(
+async fn bundler_version_from_ruby_buildpack(
     redis_result: &mut RedisResult<redis::Connection>,
 ) -> Option<String> {
-    let buildpack_release = latest_buildpack_release(redis_result);
+    let buildpack_release = latest_buildpack_release(redis_result).await;
     if let Some(cached_version) =
         cached_version_from_buildpack_release(&buildpack_release[..], redis_result)
     {
@@ -113,7 +114,9 @@ fn bundler_version_from_ruby_buildpack(
          ruby.rb",
         buildpack_release
     );
-    let ruby_file = &download_url(&ruby_langpack_url[..]).expect("Could not download ruby.rb!")[..];
+    let ruby_file = &download_url(&ruby_langpack_url[..])
+        .await
+        .expect("Could not download ruby.rb!")[..];
     let regex = Regex::new(r#"BUNDLER_VERSION += "(.+?)""#).expect("Invalid regular expression!");
     if regex.is_match(ruby_file) {
         let captures = regex.captures(ruby_file).expect("Could not match?!");
@@ -128,8 +131,8 @@ fn bundler_version_from_ruby_buildpack(
     }
 }
 
-fn is_bundler_upgraded(redis_result: &mut RedisResult<redis::Connection>) -> bool {
-    let bundler_version_result = bundler_version_from_ruby_buildpack(redis_result);
+async fn is_bundler_upgraded(redis_result: &mut RedisResult<redis::Connection>) -> bool {
+    let bundler_version_result = bundler_version_from_ruby_buildpack(redis_result).await;
     if let Some(buildpack_bundler_version_str) = bundler_version_result {
         let min_version =
             Version::parse(&min_bundler_version()[..]).expect("Could not parse min version!");
@@ -214,7 +217,7 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
 
 async fn response(headers: HeaderMap) -> Response {
     let mut redis = connect_to_redis();
-    let result = is_bundler_upgraded(&mut redis);
+    let result = is_bundler_upgraded(&mut redis).await;
     match determine_content_type(&headers) {
         "application/json" => result_to_json(result).into_response(),
         _ => result_to_html(result).into_response(),
