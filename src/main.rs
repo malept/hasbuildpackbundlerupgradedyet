@@ -55,7 +55,7 @@ fn download_latest_buildpack_release() -> String {
         .to_string()
 }
 
-fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> String {
+fn redis_cache_value(redis: &mut redis::Connection, key: &str, value: &str) -> String {
     let set_result: RedisResult<()> = redis.set_ex(key, value, 3600);
     if set_result.is_err() {
         warn!("Cannot set {} in Redis, ignoring", key);
@@ -63,15 +63,15 @@ fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> Strin
     value.to_owned()
 }
 
-fn redis_cache_hash_value(redis: &redis::Connection, hash_name: &str, key: &str, value: &str) {
+fn redis_cache_hash_value(redis: &mut redis::Connection, hash_name: &str, key: &str, value: &str) {
     let set_result: RedisResult<()> = redis.hset_nx(hash_name, key, value);
     if set_result.is_err() {
         warn!("Cannot set {} in Redis, ignoring", key);
     }
 }
 
-fn latest_buildpack_release(redis_result: &RedisResult<redis::Connection>) -> String {
-    if let Ok(ref redis) = *redis_result {
+fn latest_buildpack_release(redis_result: &mut RedisResult<redis::Connection>) -> String {
+    if let Ok(ref mut redis) = *redis_result {
         if let Ok(buildpack_release) = redis.get("latest_buildpack_release") {
             buildpack_release
         } else {
@@ -85,9 +85,9 @@ fn latest_buildpack_release(redis_result: &RedisResult<redis::Connection>) -> St
 
 fn cached_version_from_buildpack_release(
     buildpack_release: &str,
-    redis_result: &RedisResult<redis::Connection>,
+    redis_result: &mut RedisResult<redis::Connection>,
 ) -> Option<String> {
-    if let Ok(ref redis) = *redis_result {
+    if let Ok(ref mut redis) = *redis_result {
         if let Ok(version) = redis.hget("bundler_version", buildpack_release) {
             Some(version)
         } else {
@@ -99,7 +99,7 @@ fn cached_version_from_buildpack_release(
 }
 
 fn bundler_version_from_ruby_buildpack(
-    redis_result: &RedisResult<redis::Connection>,
+    redis_result: &mut RedisResult<redis::Connection>,
 ) -> Option<String> {
     let buildpack_release = latest_buildpack_release(redis_result);
     if let Some(cached_version) =
@@ -119,7 +119,7 @@ fn bundler_version_from_ruby_buildpack(
         let captures = regex.captures(ruby_file).expect("Could not match?!");
         let version_match = captures.get(1).expect("Capture not found?!");
         let version = version_match.as_str();
-        if let Ok(ref redis) = *redis_result {
+        if let Ok(ref mut redis) = *redis_result {
             redis_cache_hash_value(redis, "bundler_version", &buildpack_release[..], version);
         }
         Some(version.to_owned())
@@ -128,7 +128,7 @@ fn bundler_version_from_ruby_buildpack(
     }
 }
 
-fn is_bundler_upgraded(redis_result: &RedisResult<redis::Connection>) -> bool {
+fn is_bundler_upgraded(redis_result: &mut RedisResult<redis::Connection>) -> bool {
     let bundler_version_result = bundler_version_from_ruby_buildpack(redis_result);
     if let Some(buildpack_bundler_version_str) = bundler_version_result {
         let min_version =
@@ -213,8 +213,8 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
 }
 
 async fn response(headers: HeaderMap) -> Response {
-    let redis = connect_to_redis();
-    let result = is_bundler_upgraded(&redis);
+    let mut redis = connect_to_redis();
+    let result = is_bundler_upgraded(&mut redis);
     match determine_content_type(&headers) {
         "application/json" => result_to_json(result).into_response(),
         _ => result_to_html(result).into_response(),
