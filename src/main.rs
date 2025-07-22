@@ -59,7 +59,7 @@ async fn download_latest_buildpack_release() -> String {
 fn redis_cache_value(redis: &mut redis::Connection, key: &str, value: &str) -> String {
     let set_result: RedisResult<()> = redis.set_ex(key, value, 3600);
     if set_result.is_err() {
-        warn!("Cannot set {} in Redis, ignoring", key);
+        warn!("Cannot set {key} in Redis, ignoring");
     }
     value.to_owned()
 }
@@ -67,7 +67,7 @@ fn redis_cache_value(redis: &mut redis::Connection, key: &str, value: &str) -> S
 fn redis_cache_hash_value(redis: &mut redis::Connection, hash_name: &str, key: &str, value: &str) {
     let set_result: RedisResult<()> = redis.hset_nx(hash_name, key, value);
     if set_result.is_err() {
-        warn!("Cannot set {} in Redis, ignoring", key);
+        warn!("Cannot set {key} in Redis, ignoring");
     }
 }
 
@@ -89,11 +89,7 @@ fn cached_version_from_buildpack_release(
     redis_result: &mut RedisResult<redis::Connection>,
 ) -> Option<String> {
     if let Ok(ref mut redis) = *redis_result {
-        if let Ok(version) = redis.hget("bundler_version", buildpack_release) {
-            Some(version)
-        } else {
-            None
-        }
+        redis.hget("bundler_version", buildpack_release).ok()
     } else {
         None
     }
@@ -110,9 +106,8 @@ async fn bundler_version_from_ruby_buildpack(
     }
     let ruby_langpack_url = format!(
         "https://raw.githubusercontent.com/\
-         heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
-         ruby.rb",
-        buildpack_release
+         heroku/heroku-buildpack-ruby/{buildpack_release}/lib/language_pack/\
+         ruby.rb"
     );
     let ruby_file = &download_url(&ruby_langpack_url[..])
         .await
@@ -185,7 +180,7 @@ fn result_to_html(result: bool) -> Html<String> {
                     .replace("{{ MIN_BUNDLER_VERSION }}", &min_bundler_version()[..]),
             )
         }
-        Err(error) => Html(format!("HTML NOT FOUND: {}", error)),
+        Err(error) => Html(format!("HTML NOT FOUND: {error}")),
     }
 }
 
@@ -199,7 +194,7 @@ fn min_bundler_version() -> String {
 fn server_port() -> String {
     match env::var("PORT") {
         Ok(port) => port,
-        _ => format!("{}", DEFAULT_SERVER_PORT),
+        _ => format!("{DEFAULT_SERVER_PORT}"),
     }
 }
 
@@ -208,10 +203,7 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
         let client = redis::Client::open(&redis_url[..]).expect("Cannot connect to Redis");
         client.get_connection()
     } else {
-        Err(RedisError::from(io::Error::new(
-            io::ErrorKind::Other,
-            "REDIS_URL not found",
-        )))
+        Err(RedisError::from(io::Error::other("REDIS_URL not found")))
     }
 }
 
