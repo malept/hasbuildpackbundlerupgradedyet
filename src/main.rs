@@ -1,4 +1,4 @@
-// Copyright (C) 2016, 2017, 2018 Mark Lee
+// Copyright (C) 2016, 2017, 2018, 2025 Mark Lee
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,25 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-extern crate env_logger;
-extern crate futures;
-extern crate http;
-extern crate hyper;
-#[macro_use]
-extern crate log;
-extern crate redis;
-extern crate regex;
-extern crate reqwest;
-extern crate rquery;
-extern crate semver;
-extern crate serde;
-extern crate serde_json;
+use axum::response::{Html, IntoResponse, Json, Response};
+use axum::{Router, routing::get};
 
-use futures::{future, Future};
-use http::header::{HeaderMap, ACCEPT, CONTENT_TYPE};
-use http::{Method, Request, Response, StatusCode};
-use hyper::service::service_fn;
-use hyper::{Body, Server};
+use axum::http::header::{ACCEPT, HeaderMap};
+use log::warn;
 use redis::{Commands, RedisError, RedisResult};
 use regex::Regex;
 use rquery::Document;
@@ -173,13 +159,13 @@ fn determine_content_type(headers: &HeaderMap) -> &'static str {
     }
 }
 
-fn result_to_json(result: bool) -> String {
+fn result_to_json(result: bool) -> Json<HashMap<String, bool>> {
     let mut map = HashMap::new();
     map.insert("result".to_owned(), result);
-    serde_json::to_string(&map).expect("Could not serialize result!")
+    Json(map)
 }
 
-fn result_to_html(result: bool) -> String {
+fn result_to_html(result: bool) -> Html<String> {
     let result_str = if result {
         r#"<p class="yes"><i class="emoji"></i>Yes</p>"#
     } else {
@@ -191,10 +177,12 @@ fn result_to_html(result: bool) -> String {
             html_file
                 .read_to_string(&mut html)
                 .expect("Could not read HTML file!");
-            html.replace("{{ is_bundler_upgraded }}", result_str)
-                .replace("{{ MIN_BUNDLER_VERSION }}", &min_bundler_version()[..])
+            Html(
+                html.replace("{{ is_bundler_upgraded }}", result_str)
+                    .replace("{{ MIN_BUNDLER_VERSION }}", &min_bundler_version()[..]),
+            )
         }
-        Err(error) => format!("HTML NOT FOUND: {}", error),
+        Err(error) => Html(format!("HTML NOT FOUND: {}", error)),
     }
 }
 
@@ -224,43 +212,22 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
     }
 }
 
-type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
-
-fn response(req: Request<Body>) -> BoxFut {
-    let mut builder = Response::builder();
-    let response: http::Result<Response<Body>> = match (req.uri().path(), req.method()) {
-        ("/", &Method::GET) => {
-            let redis = connect_to_redis();
-            let result = is_bundler_upgraded(&redis);
-            let content_type = determine_content_type(req.headers());
-            let data = match content_type {
-                "application/json" => result_to_json(result),
-                _ => result_to_html(result),
-            };
-
-            builder
-                .header(CONTENT_TYPE, content_type)
-                .body(Body::from(data))
-        }
-        (_, &Method::GET) => builder.status(StatusCode::NOT_FOUND).body(Body::empty()),
-        (_, _) => builder
-            .status(StatusCode::METHOD_NOT_ALLOWED)
-            .body(Body::empty()),
-    };
-
-    Box::new(future::ok(response.expect("Could not build response")))
+async fn response(headers: HeaderMap) -> Response {
+    let redis = connect_to_redis();
+    let result = is_bundler_upgraded(&redis);
+    match determine_content_type(&headers) {
+        "application/json" => result_to_json(result).into_response(),
+        _ => result_to_html(result).into_response(),
+    }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::try_init().expect("Could not initialize env_logger!");
-    let addr = format!("0.0.0.0:{}", server_port())
-        .parse()
-        .expect("Could not parse address/port");
-    hyper::rt::run(future::lazy(move || {
-        let service = move || service_fn(response);
+    let app = Router::new().route("/", get(response));
 
-        Server::bind(&addr)
-            .serve(service)
-            .map_err(|e| eprintln!("server error: {}", e))
-    }));
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", server_port()))
+        .await
+        .unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
