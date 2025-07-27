@@ -1,4 +1,4 @@
-// Copyright (C) 2016, 2017, 2018 Mark Lee
+// Copyright (C) 2016, 2017, 2018, 2025 Mark Lee
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,25 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-extern crate env_logger;
-extern crate futures;
-extern crate http;
-extern crate hyper;
-#[macro_use]
-extern crate log;
-extern crate redis;
-extern crate regex;
-extern crate reqwest;
-extern crate rquery;
-extern crate semver;
-extern crate serde;
-extern crate serde_json;
+use axum::response::{Html, IntoResponse, Json, Response};
+use axum::{Router, routing::get};
 
-use futures::{future, Future};
-use http::header::{HeaderMap, ACCEPT, CONTENT_TYPE};
-use http::{Method, Request, Response, StatusCode};
-use hyper::service::service_fn;
-use hyper::{Body, Server};
+use axum::http::header::{ACCEPT, HeaderMap};
+use log::warn;
 use redis::{Commands, RedisError, RedisResult};
 use regex::Regex;
 use rquery::Document;
@@ -47,17 +33,18 @@ const DEFAULT_MIN_BUNDLER_VERSION: &str = "1.16.0";
 const RUBY_LANGPACK_RELEASES_URL: &str =
     "https://github.com/heroku/heroku-buildpack-ruby/releases.atom";
 
-fn download_url(url: &str) -> io::Result<String> {
-    let mut resp = reqwest::get(url).expect("Could not send HTTP request");
-    let mut body = String::new();
-    match resp.read_to_string(&mut body) {
-        Err(error) => Err(error),
-        _ => Ok(body),
-    }
+async fn download_url(url: &str) -> reqwest::Result<String> {
+    reqwest::get(url)
+        .await
+        .expect("Could not send HTTP request")
+        .text()
+        .await
 }
 
-fn download_latest_buildpack_release() -> String {
-    let xml = download_url(RUBY_LANGPACK_RELEASES_URL).expect("Could not download Atom releases!");
+async fn download_latest_buildpack_release() -> String {
+    let xml = download_url(RUBY_LANGPACK_RELEASES_URL)
+        .await
+        .expect("Could not download Atom releases!");
     let atom_doc = Document::new_from_xml_string(&xml[..]).expect("Could not parse Atom releases!");
     atom_doc
         .select("entry id")
@@ -69,53 +56,49 @@ fn download_latest_buildpack_release() -> String {
         .to_string()
 }
 
-fn redis_cache_value(redis: &redis::Connection, key: &str, value: &str) -> String {
+fn redis_cache_value(redis: &mut redis::Connection, key: &str, value: &str) -> String {
     let set_result: RedisResult<()> = redis.set_ex(key, value, 3600);
     if set_result.is_err() {
-        warn!("Cannot set {} in Redis, ignoring", key);
+        warn!("Cannot set {key} in Redis, ignoring");
     }
     value.to_owned()
 }
 
-fn redis_cache_hash_value(redis: &redis::Connection, hash_name: &str, key: &str, value: &str) {
+fn redis_cache_hash_value(redis: &mut redis::Connection, hash_name: &str, key: &str, value: &str) {
     let set_result: RedisResult<()> = redis.hset_nx(hash_name, key, value);
     if set_result.is_err() {
-        warn!("Cannot set {} in Redis, ignoring", key);
+        warn!("Cannot set {key} in Redis, ignoring");
     }
 }
 
-fn latest_buildpack_release(redis_result: &RedisResult<redis::Connection>) -> String {
-    if let Ok(ref redis) = *redis_result {
+async fn latest_buildpack_release(redis_result: &mut RedisResult<redis::Connection>) -> String {
+    if let Ok(ref mut redis) = *redis_result {
         if let Ok(buildpack_release) = redis.get("latest_buildpack_release") {
             buildpack_release
         } else {
-            let buildpack_release = download_latest_buildpack_release();
+            let buildpack_release = download_latest_buildpack_release().await;
             redis_cache_value(redis, "latest_buildpack_release", &buildpack_release[..])
         }
     } else {
-        download_latest_buildpack_release()
+        download_latest_buildpack_release().await
     }
 }
 
 fn cached_version_from_buildpack_release(
     buildpack_release: &str,
-    redis_result: &RedisResult<redis::Connection>,
+    redis_result: &mut RedisResult<redis::Connection>,
 ) -> Option<String> {
-    if let Ok(ref redis) = *redis_result {
-        if let Ok(version) = redis.hget("bundler_version", buildpack_release) {
-            Some(version)
-        } else {
-            None
-        }
+    if let Ok(ref mut redis) = *redis_result {
+        redis.hget("bundler_version", buildpack_release).ok()
     } else {
         None
     }
 }
 
-fn bundler_version_from_ruby_buildpack(
-    redis_result: &RedisResult<redis::Connection>,
+async fn bundler_version_from_ruby_buildpack(
+    redis_result: &mut RedisResult<redis::Connection>,
 ) -> Option<String> {
-    let buildpack_release = latest_buildpack_release(redis_result);
+    let buildpack_release = latest_buildpack_release(redis_result).await;
     if let Some(cached_version) =
         cached_version_from_buildpack_release(&buildpack_release[..], redis_result)
     {
@@ -123,17 +106,18 @@ fn bundler_version_from_ruby_buildpack(
     }
     let ruby_langpack_url = format!(
         "https://raw.githubusercontent.com/\
-         heroku/heroku-buildpack-ruby/{}/lib/language_pack/\
-         ruby.rb",
-        buildpack_release
+         heroku/heroku-buildpack-ruby/{buildpack_release}/lib/language_pack/\
+         ruby.rb"
     );
-    let ruby_file = &download_url(&ruby_langpack_url[..]).expect("Could not download ruby.rb!")[..];
+    let ruby_file = &download_url(&ruby_langpack_url[..])
+        .await
+        .expect("Could not download ruby.rb!")[..];
     let regex = Regex::new(r#"BUNDLER_VERSION += "(.+?)""#).expect("Invalid regular expression!");
     if regex.is_match(ruby_file) {
         let captures = regex.captures(ruby_file).expect("Could not match?!");
         let version_match = captures.get(1).expect("Capture not found?!");
         let version = version_match.as_str();
-        if let Ok(ref redis) = *redis_result {
+        if let Ok(ref mut redis) = *redis_result {
             redis_cache_hash_value(redis, "bundler_version", &buildpack_release[..], version);
         }
         Some(version.to_owned())
@@ -142,8 +126,8 @@ fn bundler_version_from_ruby_buildpack(
     }
 }
 
-fn is_bundler_upgraded(redis_result: &RedisResult<redis::Connection>) -> bool {
-    let bundler_version_result = bundler_version_from_ruby_buildpack(redis_result);
+async fn is_bundler_upgraded(redis_result: &mut RedisResult<redis::Connection>) -> bool {
+    let bundler_version_result = bundler_version_from_ruby_buildpack(redis_result).await;
     if let Some(buildpack_bundler_version_str) = bundler_version_result {
         let min_version =
             Version::parse(&min_bundler_version()[..]).expect("Could not parse min version!");
@@ -173,13 +157,13 @@ fn determine_content_type(headers: &HeaderMap) -> &'static str {
     }
 }
 
-fn result_to_json(result: bool) -> String {
+fn result_to_json(result: bool) -> Json<HashMap<String, bool>> {
     let mut map = HashMap::new();
     map.insert("result".to_owned(), result);
-    serde_json::to_string(&map).expect("Could not serialize result!")
+    Json(map)
 }
 
-fn result_to_html(result: bool) -> String {
+fn result_to_html(result: bool) -> Html<String> {
     let result_str = if result {
         r#"<p class="yes"><i class="emoji"></i>Yes</p>"#
     } else {
@@ -191,10 +175,12 @@ fn result_to_html(result: bool) -> String {
             html_file
                 .read_to_string(&mut html)
                 .expect("Could not read HTML file!");
-            html.replace("{{ is_bundler_upgraded }}", result_str)
-                .replace("{{ MIN_BUNDLER_VERSION }}", &min_bundler_version()[..])
+            Html(
+                html.replace("{{ is_bundler_upgraded }}", result_str)
+                    .replace("{{ MIN_BUNDLER_VERSION }}", &min_bundler_version()[..]),
+            )
         }
-        Err(error) => format!("HTML NOT FOUND: {}", error),
+        Err(error) => Html(format!("HTML NOT FOUND: {error}")),
     }
 }
 
@@ -208,7 +194,7 @@ fn min_bundler_version() -> String {
 fn server_port() -> String {
     match env::var("PORT") {
         Ok(port) => port,
-        _ => format!("{}", DEFAULT_SERVER_PORT),
+        _ => format!("{DEFAULT_SERVER_PORT}"),
     }
 }
 
@@ -217,50 +203,26 @@ fn connect_to_redis() -> RedisResult<redis::Connection> {
         let client = redis::Client::open(&redis_url[..]).expect("Cannot connect to Redis");
         client.get_connection()
     } else {
-        Err(RedisError::from(io::Error::new(
-            io::ErrorKind::Other,
-            "REDIS_URL not found",
-        )))
+        Err(RedisError::from(io::Error::other("REDIS_URL not found")))
     }
 }
 
-type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
-
-fn response(req: Request<Body>) -> BoxFut {
-    let mut builder = Response::builder();
-    let response: http::Result<Response<Body>> = match (req.uri().path(), req.method()) {
-        ("/", &Method::GET) => {
-            let redis = connect_to_redis();
-            let result = is_bundler_upgraded(&redis);
-            let content_type = determine_content_type(req.headers());
-            let data = match content_type {
-                "application/json" => result_to_json(result),
-                _ => result_to_html(result),
-            };
-
-            builder
-                .header(CONTENT_TYPE, content_type)
-                .body(Body::from(data))
-        }
-        (_, &Method::GET) => builder.status(StatusCode::NOT_FOUND).body(Body::empty()),
-        (_, _) => builder
-            .status(StatusCode::METHOD_NOT_ALLOWED)
-            .body(Body::empty()),
-    };
-
-    Box::new(future::ok(response.expect("Could not build response")))
+async fn response(headers: HeaderMap) -> Response {
+    let mut redis = connect_to_redis();
+    let result = is_bundler_upgraded(&mut redis).await;
+    match determine_content_type(&headers) {
+        "application/json" => result_to_json(result).into_response(),
+        _ => result_to_html(result).into_response(),
+    }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::try_init().expect("Could not initialize env_logger!");
-    let addr = format!("0.0.0.0:{}", server_port())
-        .parse()
-        .expect("Could not parse address/port");
-    hyper::rt::run(future::lazy(move || {
-        let service = move || service_fn(response);
+    let app = Router::new().route("/", get(response));
 
-        Server::bind(&addr)
-            .serve(service)
-            .map_err(|e| eprintln!("server error: {}", e))
-    }));
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", server_port()))
+        .await
+        .unwrap();
+    axum::serve(listener, app).await.unwrap();
 }

@@ -16,64 +16,103 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust via mise
+        uses: jdx/mise-action@5083fe46898c414b2475087cc79da59e7da859e8 # v2.1.11
         with:
-          override: true
-          profile: minimal
-          toolchain: stable
+          experimental: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
+      - name: Run 'cargo check'
+        run: cargo check
 
   build:
-    name: Build
-    runs-on: ${{ matrix.os }}-latest
+    name: Test Suite
+    needs: [check]
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macOS, windows, ubuntu]
+        os:
+          - macos-13 # Intel
+          - macos-latest # Apple Silicon
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - windows-latest
+          - windows-11-arm
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust via mise
+        uses: jdx/mise-action@5083fe46898c414b2475087cc79da59e7da859e8 # v2.1.11
         with:
-          override: true
-          profile: minimal
-          toolchain: stable
+          experimental: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        uses: actions-rs/cargo@v1
+        run: cargo build
+
+  build-cross:
+    name: Build (cross)
+    runs-on: ${{ matrix.os }}
+    needs: [check]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: arm-linux-androideabi
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+          - os: ubuntu-latest
+            target: powerpc64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+          - os: macOS-13 # Intel
+            target: aarch64-apple-ios
+          - os: macOS-13 # Intel
+            target: x86_64-apple-ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust via mise
+        uses: jdx/mise-action@5083fe46898c414b2475087cc79da59e7da859e8 # v2.1.11
         with:
-          command: build
+          experimental: true
+          mise_toml: |
+            [tools]
+            rust = { version = "stable", profile = "minimal", targets = "${{ matrix.target }}" }
+            "ubi:cross-rs/cross" = "0.2"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Ensure target is installed
+        run: rustup target add ${{ matrix.target }}
+      - name: Build with Cross
+        run: cross build --release --target ${{ matrix.target }}
+        env:
+          PKG_CONFIG_ALLOW_CROSS: 1
 
   lints:
     name: Lints
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust via mise
+        uses: jdx/mise-action@5083fe46898c414b2475087cc79da59e7da859e8 # v2.1.11
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
+          experimental: true
+          tool_versions: |
+            cargo-machete latest
+            taplo latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: rustfmt
-        uses: mbrobbel/rustfmt-check@b8caf241958773f7f6b0fba68879316da6be821d
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Clippy
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features -- -D warnings
+      - name: Run linters
+        run: mise run lint
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
