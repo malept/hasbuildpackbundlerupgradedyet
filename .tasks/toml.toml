@@ -1,0 +1,16 @@
+#:schema https://mise.jdx.dev/schema/mise-task.json
+
+["format:taplo"]
+tools.taplo = "latest"
+description = "Format TOML files with Taplo"
+run = "taplo format"
+
+["lint:taplo"]
+tools.taplo = "latest"
+description = "Lints TOML files with Taplo"
+run = "taplo lint"
+
+["lint:taplo-format"]
+tools.taplo = "latest"
+description = "Checks if TOML files are formatted correctly"
+run = "taplo format --check --diff"

@@ -3,7 +3,14 @@ cargo-machete = "ubi:bnjbvr/cargo-machete"
 
 [tools]
 actionlint = "latest"
+ruff = "latest"
 rust = "stable"
+uv = "latest"
 
 [task_config]
-includes = [".tasks/lint.toml"]
+includes = [
+  ".tasks/_default.toml",
+  ".tasks/python.toml",
+  ".tasks/rust.toml",
+  ".tasks/toml.toml",
+]

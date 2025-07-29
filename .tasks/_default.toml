@@ -1,0 +1,9 @@
+#:schema https://mise.jdx.dev/schema/mise-task.json
+
+[format]
+description = "Format project"
+depends = ["format:*"]
+
+[lint]
+description = "Lint project"
+depends = ["lint:*"]
