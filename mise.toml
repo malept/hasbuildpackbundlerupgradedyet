@@ -3,6 +3,7 @@ cargo-machete = "ubi:bnjbvr/cargo-machete"
 
 [tools]
 actionlint = "latest"
+python = "3.13"
 ruff = "latest"
 rust = "stable"
 uv = "latest"

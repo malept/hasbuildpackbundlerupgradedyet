@@ -1,0 +1,19 @@
+[tools.actionlint]
+version = "1.7.7"
+backend = "aqua:rhysd/actionlint"
+
+[tools.python]
+version = "3.13.5"
+backend = "core:python"
+
+[tools.ruff]
+version = "0.11.10"
+backend = "aqua:astral-sh/ruff"
+
+[tools.rust]
+version = "stable"
+backend = "core:rust"
+
+[tools.uv]
+version = "0.8.0"
+backend = "aqua:astral-sh/uv"
