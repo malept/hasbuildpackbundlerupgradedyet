@@ -21,7 +21,7 @@ import os
 import re
 from pathlib import Path
 
-import requests
+import aiohttp
 from accept_types import get_best_match  # type: ignore[import-untyped]
 from lxml import etree
 from redis.asyncio import Redis
@@ -50,19 +50,24 @@ class Buildpack:
     """Represents a Ruby buildpack."""
 
     redis: Redis | None
-    http: requests.Session
+    http: aiohttp.ClientSession
 
-    def __init__(self, session: requests.Session, redis: Redis | None) -> None:
+    def __init__(self, session: aiohttp.ClientSession, redis: Redis | None) -> None:
         """Creates a new Buildpack instance."""
         self.redis = redis
         self.http = session
+
+    async def http_get(self, url: str) -> str:
+        """Wrapper for getting the response body from an HTTP GET request."""
+        response = await self.http.get(url)
+        return await response.text()
 
     async def latest_release(self) -> str:
         """
         Determines the latest tagged version of the Ruby buildpack, which is
         cached in Redis if provided.
         """
-        releases = self.http.get(RUBY_LANGPACK_RELEASES_URL).text
+        releases = await self.http_get(RUBY_LANGPACK_RELEASES_URL)
         xml = etree.fromstring(releases.encode("utf-8"))
         nsmap = {"atom": xml.nsmap[None]}
         release: str = xml.xpath("atom:entry/atom:id/text()", namespaces=nsmap)[
@@ -86,8 +91,7 @@ class Buildpack:
         if not buildpack_release:
             buildpack_release = await self.latest_release()
 
-        ruby_langpack_url = RUBY_LANGPACK_URL.format(buildpack_release)
-        ruby_file = requests.get(ruby_langpack_url).text
+        ruby_file = await self.http_get(RUBY_LANGPACK_URL.format(buildpack_release))
         match = REGEX.search(ruby_file)
         if match:
             bundler_version = match.group(1)
@@ -101,7 +105,9 @@ class Buildpack:
         return None
 
 
-async def is_bundler_upgraded(session: requests.Session, redis: Redis | None) -> bool:
+async def is_bundler_upgraded(
+    session: aiohttp.ClientSession, redis: Redis | None
+) -> bool:
     """
     Determines if the version of Bundler used by the Ruby buildpack is greater
     than the minimum version of Bundler.
@@ -138,7 +144,7 @@ async def upgraded(request: Request) -> Response:
     """
     redis_url = os.environ.get("REDIS_URL")
     redis = Redis.from_url(redis_url) if redis_url else None
-    with requests.Session() as session:
+    async with aiohttp.ClientSession() as session:
         result = await is_bundler_upgraded(session, redis)
 
     content_type = get_best_match(request.headers.get("accept"), [TYPE_JSON, TYPE_HTML])

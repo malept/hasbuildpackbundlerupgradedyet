@@ -4,17 +4,13 @@ version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
   "accept-types>=0.4.1",
+  "aiohttp>=3.12.15",
   "lxml>=6.0.0",
   "redis[hiredis]>=6.2.0",
-  "requests>=2.32.4",
   "semver>=3.0.4",
   "starlette>=0.47.2",
   "uvicorn>=0.35.0",
 ]
 
 [dependency-groups]
-dev = [
-  "mypy>=1.17.0",
-  "types-lxml>=2025.3.30",
-  "types-requests>=2.32.4.20250611",
-]
+dev = ["mypy>=1.17.0", "types-lxml>=2025.3.30"]
