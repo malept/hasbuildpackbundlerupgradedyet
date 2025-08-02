@@ -1,4 +1,4 @@
-name: Rust
+name: CI
 
 on:
   push:
@@ -11,8 +11,8 @@ on:
       - main
 
 jobs:
-  check:
-    name: Check
+  rust-check:
+    name: "Rust: Check"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -28,9 +28,9 @@ jobs:
       - name: Run 'cargo check'
         run: cargo check
 
-  build:
-    name: Test Suite
-    needs: [check]
+  rust-build:
+    name: "Rust: Test Suite"
+    needs: [rust-check]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -55,10 +55,10 @@ jobs:
       - name: Build
         run: cargo build
 
-  build-cross:
-    name: Build (cross)
+  rust-build-cross:
+    name: "Rust: Build (cross-compile)"
     runs-on: ${{ matrix.os }}
-    needs: [check]
+    needs: [rust-check]
     strategy:
       matrix:
         include:
