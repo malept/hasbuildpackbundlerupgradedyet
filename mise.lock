@@ -1,0 +1,29 @@
+[tools.actionlint]
+version = "1.7.7"
+backend = "aqua:rhysd/actionlint"
+
+[tools.python]
+version = "3.13.5"
+backend = "core:python"
+
+[tools.ruff]
+version = "0.12.7"
+backend = "aqua:astral-sh/ruff"
+
+[tools.ruff.platforms.linux-x64]
+checksum = "sha256:58aeb49137d0a9df810ba26c778d10d612f8c1439439527a6a95c90ea318c7c5"
+size = 13001529
+url = "https://github.com/astral-sh/ruff/releases/download/0.12.7/ruff-x86_64-unknown-linux-musl.tar.gz"
+
+[tools.rust]
+version = "stable"
+backend = "core:rust"
+
+[tools.uv]
+version = "0.8.4"
+backend = "aqua:astral-sh/uv"
+
+[tools.uv.platforms.linux-x64]
+checksum = "sha256:4e16694fcc20a94136af70fb1449e8817150896af0339b6b28dfb6d006cd8116"
+size = 18986021
+url = "https://github.com/astral-sh/uv/releases/download/0.8.4/uv-x86_64-unknown-linux-musl.tar.gz"

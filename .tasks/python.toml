@@ -1,0 +1,26 @@
+#:schema https://mise.jdx.dev/schema/mise-task.json
+
+["format:ruff"]
+description = "Formats Python files"
+sources = ["python/server.py"]
+run = "ruff format python/server.py"
+
+["lint:mypy"]
+description = "Type checks Python files"
+sources = ["python/server.py"]
+run = "uv run mypy --strict python/server.py"
+
+["lint:ruff"]
+description = "Lints Python files"
+sources = ["python/server.py"]
+run = "ruff check python/server.py"
+
+["lint:ruff-format"]
+description = "Checks that Python files are formatted correctly"
+sources = ["python/server.py"]
+run = "ruff format --diff python/server.py"
+
+["server:python"]
+description = "Run Python server implementation"
+run = "uv run uvicorn server:app"
+env = { PYTHONPATH = "{{ cwd }}/python" }
