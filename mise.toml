@@ -5,7 +5,7 @@ cargo-machete = "ubi:bnjbvr/cargo-machete"
 actionlint = "latest"
 python = "3.13"
 ruff = "latest"
-rust = "stable"
+rust = { version = "stable", profile = "default" }
 uv = "latest"
 
 [task_config]
