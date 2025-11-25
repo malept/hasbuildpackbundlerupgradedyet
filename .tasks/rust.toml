@@ -5,9 +5,9 @@ description = "Lints Rust files with Clippy"
 run = "cargo clippy --all-features --all-targets --workspace"
 
 ["lint:rust-unused-deps"]
-tools.cargo-machete = "latest"
+tools.cargo-shear = "latest"
 description = "Checks if there are any unused crate dependencies declared"
-run = "cargo machete"
+run = "cargo shear"
 
 ["lint:rustfmt"]
 description = "Checks if Rust files are formatted correctly"

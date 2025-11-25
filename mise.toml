@@ -1,5 +1,5 @@
 [alias]
-cargo-machete = "ubi:bnjbvr/cargo-machete"
+cargo-shear = "github:Boshen/cargo-shear"
 
 [tools]
 actionlint = "latest"

@@ -1,12 +1,12 @@
-[tools.actionlint]
+[[tools.actionlint]]
 version = "1.7.7"
 backend = "aqua:rhysd/actionlint"
 
-[tools.python]
+[[tools.python]]
 version = "3.13.5"
 backend = "core:python"
 
-[tools.ruff]
+[[tools.ruff]]
 version = "0.12.7"
 backend = "aqua:astral-sh/ruff"
 
@@ -15,11 +15,11 @@ checksum = "sha256:58aeb49137d0a9df810ba26c778d10d612f8c1439439527a6a95c90ea318c
 size = 13001529
 url = "https://github.com/astral-sh/ruff/releases/download/0.12.7/ruff-x86_64-unknown-linux-musl.tar.gz"
 
-[tools.rust]
+[[tools.rust]]
 version = "stable"
 backend = "core:rust"
 
-[tools.uv]
+[[tools.uv]]
 version = "0.8.4"
 backend = "aqua:astral-sh/uv"
 
